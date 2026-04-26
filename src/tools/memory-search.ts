@@ -14,10 +14,10 @@ export function createMemorySearchTool(): Tool {
       required: ['query'],
     },
     async execute(args, ctx): Promise<StepOutcome> {
-      const results = await ctx.lmdClient.search(
-        args.query as string,
-        (args.limit as number) ?? 5,
-      );
+      const results = await ctx.lmdClient.queryMemory({
+        query: args.query as string,
+        limit: (args.limit as number) ?? 5,
+      });
       const formatted = results
         .map((r: any) => `[${r.type}] (score: ${r.score.toFixed(2)}) ${r.content}`)
         .join('\n');

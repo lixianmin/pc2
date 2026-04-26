@@ -5,8 +5,8 @@ import { createSpawnAgentTool } from '../../../src/tools/spawn-agent.js';
 import type { ToolContext } from '../../../src/tools/types.js';
 
 const mockLmdClient: any = {
-  search: async () => [
-    { id: '1', content: 'test fact', type: 'fact', score: 0.9, created_at: '2026-01-01' },
+  queryMemory: async () => [
+    { id: '1', content: 'test fact', type: 'fact', score: 0.9, createdAt: '2026-01-01' },
   ],
 };
 
