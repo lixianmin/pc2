@@ -14,3 +14,33 @@ function AgentChat(
     {{ ctx.output_format }}
   "#
 }
+
+test TestAgentChatTextOnly {
+  functions [AgentChat]
+  args {
+    messages #"
+      [User]
+      Hello, what can you do?
+    "#
+    tools_description "## echo\necho input"
+  }
+}
+
+test TestAgentChatToolCall {
+  functions [AgentChat]
+  args {
+    messages #"
+      [Context]
+      Time: 2026-04-26T22:00:00+08:00
+      Turn: 1
+
+      [User Message]
+      Read the file /tmp/test.txt
+    "#
+    tools_description #"
+      ## file_read
+      Read file contents
+      Parameters: {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}
+    "#
+  }
+}

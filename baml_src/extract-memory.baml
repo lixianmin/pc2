@@ -14,3 +14,29 @@ function ExtractMemory(
     {{ ctx.output_format }}
   "#
 }
+
+test TestExtractMemoryFact {
+  functions [ExtractMemory]
+  args {
+    conversation #"
+      [User]
+      I always prefer dark mode in all my editors and tools.
+
+      [Assistant]
+      Noted! I'll remember your dark mode preference.
+    "#
+  }
+}
+
+test TestExtractMemoryEmpty {
+  functions [ExtractMemory]
+  args {
+    conversation #"
+      [User]
+      hello
+
+      [Assistant]
+      Hi! How can I help you?
+    "#
+  }
+}
