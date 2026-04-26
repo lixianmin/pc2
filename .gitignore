@@ -3,5 +3,4 @@ dist/
 data/
 temp/
 *.lmd.md
-baml_client/
 .DS_Store
