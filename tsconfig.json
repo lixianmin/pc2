@@ -13,8 +13,9 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node"]
+    "types": ["node"],
+    "rootDir": "."
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "baml_client/**/*"],
   "exclude": ["node_modules", "dist", "tests"]
 }

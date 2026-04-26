@@ -1,0 +1,65 @@
+import { rename, readdir } from 'fs/promises';
+import { join } from 'path';
+import { b } from '../../baml_client/index.js';
+import type { LmdMcpClient } from '../memory/lmd-client.js';
+import type { MemoryItem } from '../../baml_client/types.js';
+import { getUnprocessedSummaries } from '../storage/history.js';
+import { readJsonl } from '../storage/jsonl.js';
+import type { Message } from '../types.js';
+
+export interface DreamResult {
+  processed: number;
+  errors: number;
+}
+
+export async function runDream(
+  dataDir: string,
+  lmdClient: LmdMcpClient,
+  abortSignal?: { aborted: boolean },
+): Promise<DreamResult> {
+  const result: DreamResult = { processed: 0, errors: 0 };
+  const threadsDir = join(dataDir, 'threads');
+
+  let threadDirs: string[];
+  try {
+    const entries = await readdir(threadsDir);
+    threadDirs = entries.map((e) => join(threadsDir, e));
+  } catch {
+    return result;
+  }
+
+  for (const threadDir of threadDirs) {
+    if (abortSignal?.aborted) break;
+
+    const unprocessed = await getUnprocessedSummaries(threadDir);
+    for (const summaryPath of unprocessed) {
+      if (abortSignal?.aborted) break;
+
+      try {
+        const match = summaryPath.match(/\/(\d+)\.md$/);
+        if (!match) continue;
+        const num = match[1];
+
+        const jsonlPath = join(threadDir, `messages-${num}.jsonl`);
+        const messages = await readJsonl<Message>(jsonlPath);
+        if (messages.length === 0) continue;
+
+        const messagesText = messages.map((m) => `[${m.role}] ${m.content}`).join('\n');
+        const memoryItems: MemoryItem[] = await b.ExtractMemory(messagesText);
+
+        for (const item of memoryItems) {
+          await lmdClient.addMemory({ content: item.content, type: item.type as 'fact' | 'episode' | 'relation' });
+        }
+
+        const newPath = summaryPath.replace(/\.md$/, '.lmd.md');
+        await rename(summaryPath, newPath);
+
+        result.processed++;
+      } catch {
+        result.errors++;
+      }
+    }
+  }
+
+  return result;
+}
