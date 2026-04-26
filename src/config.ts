@@ -1,0 +1,18 @@
+export const config = {
+  modelContextWindow: 100_000,
+  freezeThreshold: () => config.modelContextWindow * 0.3,
+  maxRounds: 30,
+  subAgentMaxRounds: 15,
+  agentTimeoutMs: 20 * 60 * 1000,
+  subAgentTimeoutMs: 10 * 60 * 1000,
+  antiLoopInterval: 7,
+  forceAskUserTurn: 25,
+  subAgentHeartbeatMs: 60 * 1000,
+  lmdPort: 58080,
+  lmdHost: 'localhost',
+  cronCheckIntervalMs: 120_000,
+  autonomousIdleMs: 1_800_000,
+  timezone: 'Asia/Shanghai',
+  dataDir: 'data',
+  tempDir: 'temp',
+};
