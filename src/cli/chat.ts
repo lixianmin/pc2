@@ -15,6 +15,8 @@ import { createAskUserTool } from '../tools/ask-user.js';
 import { createSpawnAgentTool } from '../tools/spawn-agent.js';
 import { config } from '../config.js';
 import { writeMeta, updateMeta, listThreads, loadThreadHistory } from '../storage/thread.js';
+import { LmdMcpClient } from '../memory/lmd-client.js';
+import { scanSkillDirectory } from '../skill-sop/loader.js';
 
 export function makeThreadDir(): string {
   const now = new Date();
@@ -40,6 +42,11 @@ export async function startChat(options: { initialTask?: string }): Promise<void
   registry.register(createMemorySearchTool());
   registry.register(createAskUserTool());
   registry.register(createSpawnAgentTool());
+
+  const lmdClient = new LmdMcpClient({ host: config.lmdHost, port: config.lmdPort });
+  const sops = await scanSkillDirectory('sop');
+  const skills = await scanSkillDirectory('skills');
+  logo.info('Chat initialized', { sops: sops.length, skills: skills.length });
 
   const threadDir = makeThreadDir();
   logo.info('Chat thread dir', { threadDir });
@@ -101,7 +108,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
     if (input.startsWith('/resume')) { await handleResume(input); prompt(); return; }
 
     let textYielded = false;
-    for await (const event of loop.execute(input, { threadDir: activeThreadDir, dataDir: config.dataDir })) {
+    for await (const event of loop.execute(input, { threadDir: activeThreadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
       if (event.type === 'text') {
         textYielded = true;
         process.stdout.write(event.content);
@@ -125,7 +132,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
   });
 
   if (options.initialTask) {
-    for await (const event of loop.execute(options.initialTask, { threadDir: activeThreadDir, dataDir: config.dataDir })) {
+    for await (const event of loop.execute(options.initialTask, { threadDir: activeThreadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
       if (event.type === 'text') process.stdout.write(event.content);
     }
     process.stdout.write('\n');
