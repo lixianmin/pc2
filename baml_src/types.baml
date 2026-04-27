@@ -3,6 +3,7 @@ class ToolCall {
   arguments string
   id string
 }
+
 class ChatResponse {
   text string
   tool_calls ToolCall[]

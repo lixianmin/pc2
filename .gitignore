@@ -4,3 +4,5 @@ data/
 temp/
 *.lmd.md
 .DS_Store
+.env
+baml_client/
