@@ -11,7 +11,7 @@ const mockLmdClient: any = {
 };
 
 const dummyCtx: ToolContext = {
-  turn: 0, index: 0, lmdClient: mockLmdClient, dataDir: '/tmp', agentId: 'test', isSubAgent: false,
+  turn: 0, index: 0, lmdClient: mockLmdClient, dataDir: '/tmp', agentId: 'test', isSubAgent: false, workspaceRoot: '/tmp',
 };
 
 describe('memory_search tool', () => {

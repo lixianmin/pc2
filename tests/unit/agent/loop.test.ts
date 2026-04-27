@@ -10,6 +10,14 @@ vi.mock('../../../baml_client/index.js', () => ({
   },
 }));
 
+vi.mock('../../../src/storage/tokens.js', async () => {
+  const actual = await vi.importActual<typeof import('../../../src/storage/tokens.js')>('../../../src/storage/tokens.js');
+  return {
+    ...actual,
+    countTokens: vi.fn(actual.countTokens),
+  };
+});
+
 describe('AgentLoop', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,5 +87,38 @@ describe('AgentLoop', () => {
       events.push(event);
     }
     expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'max_rounds' });
+  });
+
+  it('truncates messages when approaching context limit', async () => {
+    const { b } = await import('../../../baml_client/index.js');
+    const { countTokens } = await import('../../../src/storage/tokens.js');
+
+    let callCount = 0;
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      callCount++;
+      if (callCount === 1) {
+        return { text: 'A'.repeat(50000), tool_calls: [{ name: 'echo', arguments: '{"msg":"x"}', id: 'tc_1' }] };
+      }
+      return { text: 'Done', tool_calls: [] };
+    });
+
+    (countTokens as ReturnType<typeof vi.fn>).mockResolvedValue(70000);
+
+    const echoTool: Tool = {
+      name: 'echo',
+      description: 'echo',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => ({ data: 'ok', nextPrompt: null, shouldExit: false }),
+    };
+
+    const registry = new ToolRegistry();
+    registry.register(echoTool);
+    const loop = new AgentLoop(registry);
+    const events = [];
+    for await (const event of loop.execute('test', { maxRounds: 5 })) {
+      events.push(event);
+    }
+    expect(events.some(e => e.type === 'warning' && String(e.content).includes('truncated'))).toBe(true);
+    expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'completed' });
   });
 });

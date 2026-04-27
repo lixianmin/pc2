@@ -4,24 +4,31 @@ import { readJsonl } from './jsonl.js';
 import { getFrozenFiles, getUnprocessedSummaries } from './history.js';
 import { config } from '../config.js';
 
+const freezeLocks = new Map<string, Promise<boolean>>();
+
 export async function checkAndFreeze(
   threadDir: string,
   tokenCounter: (msgs: any[]) => Promise<number>,
 ): Promise<boolean> {
-  const currentFile = join(threadDir, 'messages-current.jsonl');
-  const messages = await readJsonl(currentFile);
-  if (messages.length === 0) return false;
+  const prev = freezeLocks.get(threadDir) ?? Promise.resolve(false);
+  const next = prev.then(async () => {
+    const currentFile = join(threadDir, 'messages-current.jsonl');
+    const messages = await readJsonl(currentFile);
+    if (messages.length === 0) return false;
 
-  const tokens = await tokenCounter(messages);
-  if (tokens < config.freezeThreshold()) return false;
+    const tokens = await tokenCounter(messages);
+    if (tokens < config.freezeThreshold()) return false;
 
-  const frozenFiles = await getFrozenFiles(threadDir);
-  const nextNum = String(frozenFiles.length + 1).padStart(3, '0');
-  const frozenPath = join(threadDir, `messages-${nextNum}.jsonl`);
+    const frozenFiles = await getFrozenFiles(threadDir);
+    const nextNum = String(frozenFiles.length + 1).padStart(3, '0');
+    const frozenPath = join(threadDir, `messages-${nextNum}.jsonl`);
 
-  await rename(currentFile, frozenPath);
-  await writeFile(currentFile, '', 'utf-8');
-  return true;
+    await rename(currentFile, frozenPath);
+    await writeFile(currentFile, '', 'utf-8');
+    return true;
+  });
+  freezeLocks.set(threadDir, next.catch(() => false));
+  return next;
 }
 
 export async function checkAndSummarize(

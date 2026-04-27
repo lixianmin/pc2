@@ -10,6 +10,7 @@ const dummyCtx: ToolContext = {
   dataDir: '/tmp',
   agentId: 'test',
   isSubAgent: false,
+  workspaceRoot: '/tmp',
 };
 
 const fakeTool: Tool = {

@@ -40,6 +40,9 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
       if (BLOCKED_COMMANDS.some((b) => cmd.trim().startsWith(b))) {
         return { data: `Blocked command: ${cmd}. Use web_fetch instead.`, nextPrompt: null, shouldExit: false };
       }
+      if (!opts.autoApprove && !isReadOnlyCommand(cmd)) {
+        return { data: `Command requires approval: ${cmd}. Set autoApprove or use a read-only alternative.`, nextPrompt: null, shouldExit: false };
+      }
       try {
         const { stdout, stderr } = await execAsync(cmd, {
           cwd: opts.cwd,

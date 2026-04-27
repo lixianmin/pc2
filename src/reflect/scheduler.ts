@@ -24,13 +24,19 @@ export function createCronSchedulerModule(
 
       for (const job of jobs) {
         if (!job.enabled) continue;
-        const last = lastRuns.get(job.expression) ?? 0;
         try {
           const interval = CronExpressionParser.parse(job.expression, { tz: job.timezone });
-          const next = interval.next().getTime();
-          if (next <= now && now - last > 60_000) {
+          const prev = interval.prev().getTime();
+          const last = lastRuns.get(job.task);
+
+          if (last === undefined) {
+            lastRuns.set(job.task, prev);
+            if (now - prev <= checkIntervalMs) {
+              tasks.push(job.task);
+            }
+          } else if (prev > last) {
             tasks.push(job.task);
-            lastRuns.set(job.expression, now);
+            lastRuns.set(job.task, prev);
           }
         } catch {
           // invalid cron expression — skip

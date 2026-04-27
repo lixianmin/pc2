@@ -1,17 +1,15 @@
 import type { Message } from '../types.js';
 
-let _encoder: Awaited<ReturnType<typeof initEncoder>> | null = null;
+let _encoderPromise: Promise<any> | null = null;
 
-async function initEncoder() {
-  const tiktoken = await import('tiktoken');
-  return tiktoken.encoding_for_model('gpt-4o');
-}
-
-async function getEncoder() {
-  if (!_encoder) {
-    _encoder = await initEncoder();
+function getEncoder() {
+  if (!_encoderPromise) {
+    _encoderPromise = (async () => {
+      const tiktoken = await import('tiktoken');
+      return tiktoken.encoding_for_model('gpt-4o');
+    })();
   }
-  return _encoder;
+  return _encoderPromise;
 }
 
 export async function countTokens(text: string): Promise<number> {
@@ -34,8 +32,8 @@ export async function countMessagesTokens(messages: Message[]): Promise<number> 
 }
 
 export function freeEncoder(): void {
-  if (_encoder) {
-    _encoder.free();
-    _encoder = null;
+  if (_encoderPromise) {
+    _encoderPromise.then(enc => enc.free()).catch(() => {});
+    _encoderPromise = null;
   }
 }

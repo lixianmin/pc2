@@ -7,10 +7,11 @@ import type { CallbackContext } from './turn-end-callback.js';
 import { appendJsonl } from '../storage/jsonl.js';
 import { buildSystemPrompt, buildDynamicTail } from './prompt.js';
 import { checkAndFreeze, checkAndSummarize } from '../storage/summary.js';
-import { countMessagesTokens } from '../storage/tokens.js';
+import { countMessagesTokens, countTokens } from '../storage/tokens.js';
 import type { LmdMcpClient } from '../memory/lmd-client.js';
 import type { SkillDefinition } from '../skill-sop/types.js';
 import { join } from 'path';
+import { config } from '../config.js';
 
 export type AgentEvent =
   | { type: 'text'; content: string }
@@ -117,6 +118,7 @@ export class AgentLoop {
           dataDir: options.dataDir ?? 'data',
           agentId: options.agentId ?? 'main',
           isSubAgent,
+          workspaceRoot: config.workspaceRoot,
         };
 
         const result = await this.registry.dispatch(tc.name, args, toolCtx);
@@ -156,6 +158,15 @@ export class AgentLoop {
           try { return (await b.SummarizeHistory(text)).toString(); }
           catch { return null as any; }
         });
+      }
+
+      const msgTokens = await countTokens(messages);
+      const budget = Math.floor(config.modelContextWindow * 0.6);
+      if (msgTokens > budget) {
+        const lines = messages.split('\n');
+        const keepCount = Math.max(20, Math.floor(lines.length * 0.3));
+        messages = '[...earlier context truncated...]\n\n' + lines.slice(-keepCount).join('\n');
+        yield { type: 'warning', content: `Context truncated: removed ${lines.length - keepCount} lines to stay within token budget` };
       }
     }
 

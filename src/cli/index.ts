@@ -27,13 +27,17 @@ reflectCmd
     const { createAutonomousModule } = await import('../reflect/autonomous.js');
     const { createCronSchedulerModule } = await import('../reflect/scheduler.js');
 
-    const runner = new ReflectRunner([
-      createAutonomousModule(),
-      createCronSchedulerModule([]),
-    ]);
+    const runner = new ReflectRunner(
+      [createAutonomousModule(), createCronSchedulerModule([])],
+      (task) => console.log(`[reflect] executing: ${task}`),
+    );
     runner.start();
     console.log('Reflect started. Press Ctrl+C to stop.');
     process.on('SIGINT', () => {
+      runner.stop();
+      process.exit(0);
+    });
+    process.on('SIGTERM', () => {
       runner.stop();
       process.exit(0);
     });

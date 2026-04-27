@@ -8,7 +8,7 @@ import type { ToolContext } from '../../../src/tools/types.js';
 
 const TEST_DIR = path.join(__dirname, 'tmp-file-tools');
 const dummyCtx: ToolContext = {
-  turn: 0, index: 0, lmdClient: null as any, dataDir: TEST_DIR, agentId: 'test', isSubAgent: false,
+  turn: 0, index: 0, lmdClient: null as any, dataDir: TEST_DIR, agentId: 'test', isSubAgent: false, workspaceRoot: TEST_DIR,
 };
 
 describe('file tools', () => {
@@ -77,6 +77,34 @@ describe('file tools', () => {
       const tool = createFileEditTool();
       const result = await tool.execute({ path: filePath, old_string: 'xyz', new_string: 'abc' }, dummyCtx);
       expect(String(result.data)).toContain('not found');
+    });
+  });
+
+  describe('path sandbox', () => {
+    it('file_read rejects path traversal', async () => {
+      const tool = createFileReadTool();
+      const result = await tool.execute({ path: '/etc/passwd' }, dummyCtx);
+      expect(String(result.data)).toContain('outside workspace');
+    });
+
+    it('file_write rejects path traversal', async () => {
+      const tool = createFileWriteTool();
+      const result = await tool.execute({ path: '/tmp/evil.txt', content: 'pwned' }, dummyCtx);
+      expect(String(result.data)).toContain('outside workspace');
+    });
+
+    it('file_edit rejects path traversal', async () => {
+      const tool = createFileEditTool();
+      const result = await tool.execute({ path: '/etc/hosts', old_string: 'x', new_string: 'y' }, dummyCtx);
+      expect(String(result.data)).toContain('outside workspace');
+    });
+
+    it('file_read allows path within workspace', async () => {
+      const filePath = path.join(TEST_DIR, 'safe.txt');
+      await fs.writeFile(filePath, 'safe content', 'utf-8');
+      const tool = createFileReadTool();
+      const result = await tool.execute({ path: filePath }, dummyCtx);
+      expect(String(result.data)).toContain('safe content');
     });
   });
 });

@@ -67,6 +67,25 @@ describe('checkAndFreeze', () => {
     expect(frozen2).toHaveLength(1);
     expect((frozen2[0] as Message).content).toBe('new');
   });
+
+  it('concurrent calls do not conflict (race condition)', async () => {
+    const threshold = config.freezeThreshold();
+    const tokenCounter = async () => threshold + 1;
+
+    await appendJsonl(CURRENT_FILE, makeMsg('1', 'first'));
+
+    const [r1, r2] = await Promise.all([
+      checkAndFreeze(THREAD_DIR, tokenCounter),
+      checkAndFreeze(THREAD_DIR, tokenCounter),
+    ]);
+
+    const successes = [r1, r2].filter(Boolean).length;
+    expect(successes).toBe(1);
+
+    const files = await fs.readdir(THREAD_DIR);
+    const frozen = files.filter(f => f.startsWith('messages-') && f !== 'messages-current.jsonl');
+    expect(frozen).toHaveLength(1);
+  });
 });
 
 describe('checkAndSummarize', () => {

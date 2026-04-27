@@ -8,6 +8,7 @@ export interface ToolContext {
   dataDir: string;
   agentId: string;
   isSubAgent: boolean;
+  workspaceRoot: string;
 }
 
 export interface Tool {

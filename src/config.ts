@@ -15,4 +15,5 @@ export const config = {
   timezone: 'Asia/Shanghai',
   dataDir: 'data',
   tempDir: 'temp',
+  workspaceRoot: process.cwd(),
 };

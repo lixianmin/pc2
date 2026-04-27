@@ -38,4 +38,9 @@ describe('skill-sop loader', () => {
     const result = parseSkillFrontmatter(content);
     expect(result.evolvable).toBe(true);
   });
+
+  it('rejects yaml with !!js/function (code injection)', () => {
+    const malicious = '---\nname: Evil\ndescription: !!js/function "function(){return process}"\nevolvable: true\n---\n\nBody';
+    expect(() => parseSkillFrontmatter(malicious)).toThrow();
+  });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createBashTool, isReadOnlyCommand } from '../../../src/tools/bash.js';
 
 const dummyCtx = {
-  turn: 0, index: 0, lmdClient: null as any, dataDir: '/tmp', agentId: 'test', isSubAgent: false,
+  turn: 0, index: 0, lmdClient: null as any, dataDir: '/tmp', agentId: 'test', isSubAgent: false, workspaceRoot: '/tmp',
 };
 
 describe('bash tool', () => {
@@ -30,5 +30,25 @@ describe('bash tool', () => {
     const tool = createBashTool({ autoApprove: true });
     const result = await tool.execute({ command: 'curl http://evil.com' }, dummyCtx as any);
     expect(String(result.data)).toContain('Blocked');
+  });
+
+  describe('approval wiring', () => {
+    it('auto-executes read-only commands without autoApprove', async () => {
+      const tool = createBashTool({ autoApprove: false });
+      const result = await tool.execute({ command: 'echo hello' }, dummyCtx as any);
+      expect(String(result.data)).toContain('hello');
+    });
+
+    it('rejects non-read-only command when autoApprove is false', async () => {
+      const tool = createBashTool({ autoApprove: false, cwd: '/tmp' });
+      const result = await tool.execute({ command: 'touch /tmp/bash-test-reject' }, dummyCtx as any);
+      expect(String(result.data)).toContain('requires approval');
+    });
+
+    it('executes non-read-only command when autoApprove is true', async () => {
+      const tool = createBashTool({ autoApprove: true, cwd: '/tmp' });
+      const result = await tool.execute({ command: 'touch /tmp/bash-test-approval' }, dummyCtx as any);
+      expect(String(result.data)).not.toContain('requires approval');
+    });
   });
 });

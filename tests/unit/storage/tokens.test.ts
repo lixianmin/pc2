@@ -25,4 +25,14 @@ describe('tokens', () => {
     const count = await countMessagesTokens(messages);
     expect(count).toBeGreaterThan(0);
   });
+
+  it('concurrent calls share same encoder safely', async () => {
+    freeEncoder();
+    const results = await Promise.all([
+      countTokens('hello'),
+      countTokens('world'),
+      countTokens('test'),
+    ]);
+    expect(results.every(r => r > 0)).toBe(true);
+  });
 });
