@@ -92,7 +92,8 @@ describe('integration: chat flow', () => {
     const lines = readFileSync(jsonlPath, 'utf-8').split('\n').filter(l => l.trim());
     expect(lines.length).toBeGreaterThanOrEqual(2);
     const firstMsg = JSON.parse(lines[0]);
-    expect(firstMsg.role).toBe('assistant');
+    expect(firstMsg.role).toBe('user');
+    expect(firstMsg.content).toBe('find top 2 projects');
   });
 
   it('memory_search returns graceful message when LMD unavailable', async () => {

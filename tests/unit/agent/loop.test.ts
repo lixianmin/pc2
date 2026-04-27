@@ -122,6 +122,46 @@ describe('AgentLoop', () => {
     expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'completed' });
   });
 
+  it('resumeHistory injects prior history into prompt', async () => {
+    const { b } = await import('../../../baml_client/index.js');
+    let capturedPrompt = '';
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (prompt: string) => {
+      capturedPrompt = prompt;
+      return { text: 'Done', tool_calls: [] };
+    });
+
+    const registry = new ToolRegistry();
+    const loop = new AgentLoop(registry);
+    loop.resumeHistory('[User]\nprevious question\n\n[Assistant]\nprevious answer\n\n');
+
+    for await (const _ of loop.execute('new question')) { /* consume */ }
+
+    expect(capturedPrompt).toContain('previous question');
+    expect(capturedPrompt).toContain('previous answer');
+    expect(capturedPrompt).toContain('[User]\nnew question');
+  });
+
+  it('persists user messages to JSONL when threadDir is set', async () => {
+    const { b } = await import('../../../baml_client/index.js');
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockResolvedValue({
+      text: 'Done',
+      tool_calls: [],
+    });
+
+    const registry = new ToolRegistry();
+    const loop = new AgentLoop(registry);
+    const tmpDir = `/tmp/loop-test-${Date.now()}`;
+    const { mkdirSync, readFileSync, rmSync } = await import('fs');
+    mkdirSync(tmpDir, { recursive: true });
+
+    for await (const _ of loop.execute('test user message', { threadDir: tmpDir })) { /* consume */ }
+
+    const content = readFileSync(`${tmpDir}/messages-current.jsonl`, 'utf-8');
+    expect(content).toContain('"role":"user"');
+    expect(content).toContain('test user message');
+    rmSync(tmpDir, { recursive: true });
+  });
+
   it('carries conversation history across execute() calls', async () => {
     const { b } = await import('../../../baml_client/index.js');
     let promptCapture: string[] = [];

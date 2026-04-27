@@ -36,6 +36,10 @@ export class AgentLoop {
   private conversationHistory = '';
   constructor(private registry: ToolRegistry) {}
 
+  resumeHistory(history: string): void {
+    this.conversationHistory = history;
+  }
+
   async *execute(
     userMessage: string,
     options: LoopOptions = {},
@@ -49,6 +53,15 @@ export class AgentLoop {
 
     const systemMsg = buildSystemPrompt(toolsDesc, options.skills ?? [], options.sops ?? []);
     let messages = this.conversationHistory + `[User]\n${userMessage}\n\n`;
+
+    if (options.threadDir) {
+      await appendJsonl(
+        join(options.threadDir, 'messages-current.jsonl'),
+        { id: `msg_u_${Date.now()}`, role: 'user', content: userMessage,
+          timestamp: new Date().toISOString() } satisfies Message,
+      );
+    }
+
     let lastAssistantText = '';
     let consecutiveFailures = 0;
     let lastFailedTool: string | null = null;
