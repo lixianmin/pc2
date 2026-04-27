@@ -14,6 +14,9 @@ export function createMemorySearchTool(): Tool {
       required: ['query'],
     },
     async execute(args, ctx): Promise<StepOutcome> {
+      if (!ctx.lmdClient) {
+        return { data: 'Memory not available (LMD not connected).', nextPrompt: null, shouldExit: false };
+      }
       const results = await ctx.lmdClient.queryMemory({
         query: args.query as string,
         limit: (args.limit as number) ?? 5,

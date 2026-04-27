@@ -4,7 +4,7 @@ import type { LmdMcpClient } from '../memory/lmd-client.js';
 export interface ToolContext {
   turn: number;
   index: number;
-  lmdClient: LmdMcpClient;
+  lmdClient: LmdMcpClient | null;
   dataDir: string;
   agentId: string;
   isSubAgent: boolean;

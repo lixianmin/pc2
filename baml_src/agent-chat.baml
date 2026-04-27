@@ -6,10 +6,10 @@ function AgentChat(
   prompt #"
     You are a personal AI agent. Follow your instructions and use tools when needed.
 
-    {{ messages }}
-
     Available tools:
     {{ tools_description }}
+
+    {{ messages }}
 
     {{ ctx.output_format }}
   "#

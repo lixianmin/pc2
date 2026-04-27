@@ -79,9 +79,11 @@ export class AgentLoop {
         yield { type: 'warning', content: 'LLM call failed, retrying...' };
         try {
           response = await b.AgentChat(fullMessages, toolsDesc);
-        } catch {
+        } catch (llmErr) {
+          const errMsg = llmErr instanceof Error ? llmErr.message : String(llmErr);
           logo.error('Agent loop done', { reason: 'llm_error', turns: turn, elapsed_ms: Date.now() - startTime });
           this.conversationHistory = messages;
+          yield { type: 'warning', content: `LLM call failed: ${errMsg}. Please try again.` };
           yield { type: 'done', reason: 'llm_error' };
           return;
         }
@@ -104,6 +106,8 @@ export class AgentLoop {
               toolCalls, timestamp: new Date().toISOString() } satisfies Message,
           );
         }
+      } else {
+        logo.warn('LLM returned empty text', { turn, has_tool_calls: !!response.tool_calls?.length });
       }
 
       if (!response.tool_calls || response.tool_calls.length === 0) {
