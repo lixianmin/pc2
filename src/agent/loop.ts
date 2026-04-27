@@ -49,6 +49,8 @@ export class AgentLoop {
     const systemMsg = buildSystemPrompt(toolsDesc, options.skills ?? [], options.sops ?? []);
     let messages = '';
     let lastAssistantText = '';
+    let consecutiveFailures = 0;
+    let lastFailedTool: string | null = null;
 
     for (let turn = 1; turn <= maxRounds; turn++) {
       if (Date.now() - startTime > timeoutMs) {
@@ -136,6 +138,25 @@ export class AgentLoop {
         yield { type: 'tool_result', name: tc.name, call_id: tc.id, result: resultStr };
         messages += `[Tool Result: ${tc.name}]\n${resultStr}\n\n`;
 
+        const isFailure = resultStr.includes('Fetch error') ||
+          resultStr.includes('not found') ||
+          resultStr.includes('Blocked command') ||
+          resultStr.includes('not configured') ||
+          resultStr.includes('not allowed') ||
+          resultStr.startsWith('Search error');
+
+        if (isFailure) {
+          if (tc.name === lastFailedTool) {
+            consecutiveFailures++;
+          } else {
+            consecutiveFailures = 1;
+            lastFailedTool = tc.name;
+          }
+        } else {
+          consecutiveFailures = 0;
+          lastFailedTool = null;
+        }
+
         if (options.threadDir) {
           await appendJsonl(
             join(options.threadDir, 'messages-current.jsonl'),
@@ -156,11 +177,18 @@ export class AgentLoop {
         lastResponse: response.text ?? '',
         dataDir: options.dataDir ?? 'data',
         hasVerificationEvidence: response.tool_calls?.some(tc => tc.name === 'spawn_agent') ?? false,
+        consecutiveFailures,
+        lastFailedTool,
       };
       const warning = turnEndCallback(turn, callbackCtx);
       if (warning) {
         yield { type: 'warning', content: warning };
         messages += `[System]\n${warning}\n\n`;
+      }
+
+      if (consecutiveFailures >= 3) {
+        yield { type: 'warning', content: `[Anti-Loop] ${lastFailedTool} failed ${consecutiveFailures} times in a row. Use ask_user to ask for guidance or change strategy entirely.` };
+        messages += `[System] ${lastFailedTool} has failed ${consecutiveFailures} times. You must change approach NOW. Use a different tool or ask_user.\n\n`;
       }
 
       if (options.threadDir) {

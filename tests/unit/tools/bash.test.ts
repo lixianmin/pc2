@@ -26,10 +26,17 @@ describe('bash tool', () => {
     expect(String(result.data)).toContain('hello');
   });
 
-  it('blocks curl and wget', async () => {
+  it('curl requires approval when autoApprove is false', async () => {
+    const tool = createBashTool({ autoApprove: false });
+    const result = await tool.execute({ command: 'curl http://example.com' }, dummyCtx as any);
+    expect(String(result.data)).toContain('requires approval');
+  });
+
+  it('curl executes when autoApprove is true', async () => {
     const tool = createBashTool({ autoApprove: true });
-    const result = await tool.execute({ command: 'curl http://evil.com' }, dummyCtx as any);
-    expect(String(result.data)).toContain('Blocked');
+    const result = await tool.execute({ command: 'curl --version' }, dummyCtx as any);
+    expect(String(result.data)).not.toContain('Blocked');
+    expect(String(result.data)).not.toContain('requires approval');
   });
 
   describe('approval wiring', () => {

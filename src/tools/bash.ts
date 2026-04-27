@@ -11,7 +11,7 @@ const READ_ONLY_COMMANDS = [
   'echo', 'pwd', 'which', 'env', 'printenv', 'node -e', 'npx tsc --noEmit',
 ];
 
-const BLOCKED_COMMANDS = ['curl', 'wget'];
+const BLOCKED_COMMANDS: string[] = [];
 
 export function isReadOnlyCommand(cmd: string): boolean {
   const base = cmd.trim().split(/\s+/)[0];

@@ -7,6 +7,8 @@ const baseCtx: CallbackContext = {
   lastResponse: '',
   dataDir: '/tmp',
   hasVerificationEvidence: false,
+  consecutiveFailures: 0,
+  lastFailedTool: null,
 };
 
 describe('turnEndCallback', () => {
@@ -154,5 +156,51 @@ describe('turnEndCallback', () => {
     };
     const result = turnEndCallback(3, ctx);
     expect(result).toContain('Blocked');
+  });
+
+  it('returns anti-loop warning on 3 consecutive failures', () => {
+    const ctx: CallbackContext = {
+      ...baseCtx,
+      consecutiveFailures: 3,
+      lastFailedTool: 'web_search',
+    };
+    const result = turnEndCallback(2, ctx);
+    expect(result).not.toBeNull();
+    expect(result).toContain('Anti-Loop');
+    expect(result).toContain('web_search');
+    expect(result).toContain('3');
+  });
+
+  it('returns anti-loop warning on 5 consecutive failures', () => {
+    const ctx: CallbackContext = {
+      ...baseCtx,
+      consecutiveFailures: 5,
+      lastFailedTool: 'fetch_url',
+    };
+    const result = turnEndCallback(4, ctx);
+    expect(result).toContain('Anti-Loop');
+    expect(result).toContain('5');
+  });
+
+  it('does not return anti-loop on fewer than 3 consecutive failures', () => {
+    const ctx: CallbackContext = {
+      ...baseCtx,
+      consecutiveFailures: 2,
+      lastFailedTool: 'web_search',
+    };
+    const result = turnEndCallback(2, ctx);
+    expect(result).toBeNull();
+  });
+
+  it('consecutive failure anti-loop takes priority over turn-based warning', () => {
+    const ctx: CallbackContext = {
+      ...baseCtx,
+      consecutiveFailures: 3,
+      lastFailedTool: 'file_edit',
+    };
+    const result = turnEndCallback(7, ctx);
+    expect(result).toContain('Anti-Loop');
+    expect(result).toContain('file_edit');
+    expect(result).not.toContain('Warning');
   });
 });

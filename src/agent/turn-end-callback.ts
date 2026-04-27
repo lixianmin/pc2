@@ -3,6 +3,8 @@ export interface CallbackContext {
   lastResponse: string;
   dataDir: string;
   hasVerificationEvidence: boolean;
+  consecutiveFailures: number;
+  lastFailedTool: string | null;
 }
 
 const COMPLETION_PATTERNS = [
@@ -19,6 +21,10 @@ function isCompletionClaim(text: string): boolean {
 }
 
 export function turnEndCallback(turn: number, ctx: CallbackContext): string | null {
+  if (ctx.consecutiveFailures >= 3 && ctx.lastFailedTool) {
+    return `[Anti-Loop] Tool "${ctx.lastFailedTool}" has failed ${ctx.consecutiveFailures} times consecutively. You MUST use a completely different approach or use ask_user to ask for guidance. Do NOT call ${ctx.lastFailedTool} again.`;
+  }
+
   if (turn > 0 && turn % 7 === 0) {
     return `[Anti-Loop Warning] Turn ${turn}: you may be repeating a failed approach. Change strategy.`;
   }

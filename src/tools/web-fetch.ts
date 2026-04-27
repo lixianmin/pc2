@@ -18,6 +18,15 @@ export function isUrlAllowed(urlStr: string): boolean {
   }
 }
 
+function extractTextFromHtml(html: string): string {
+  let text = html.replace(/<script[\s\S]*?<\/script>/gi, '');
+  text = text.replace(/<style[\s\S]*?<\/style>/gi, '');
+  text = text.replace(/<[^>]*>/g, '\n');
+  text = text.replace(/\n{3,}/g, '\n\n');
+  text = text.replace(/[ \t]+/g, ' ');
+  return text.trim();
+}
+
 export function createWebFetchTool(): Tool {
   return {
     name: 'web_fetch',
@@ -35,9 +44,20 @@ export function createWebFetchTool(): Tool {
       }
       try {
         const resp = await fetch(args.url as string);
+        const contentType = resp.headers.get('content-type') ?? '';
         const text = await resp.text();
-        const stripped = text.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 5000);
-        return { data: stripped, nextPrompt: null, shouldExit: false };
+
+        const MAX_JSON = 50000;
+        const MAX_HTML = 20000;
+
+        let result: string;
+        if (contentType.includes('application/json') || contentType.includes('text/plain') || text.trimStart().startsWith('{') || text.trimStart().startsWith('[')) {
+          result = text.slice(0, MAX_JSON);
+        } else {
+          result = extractTextFromHtml(text).slice(0, MAX_HTML);
+        }
+
+        return { data: result, nextPrompt: null, shouldExit: false };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         return { data: `Fetch error: ${msg}`, nextPrompt: null, shouldExit: false };
