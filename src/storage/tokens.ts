@@ -1,4 +1,5 @@
 import type { Message } from '../types.js';
+import { logo } from '../lib/logo.js';
 
 let _encoderPromise: Promise<any> | null = null;
 
@@ -6,7 +7,9 @@ function getEncoder() {
   if (!_encoderPromise) {
     _encoderPromise = (async () => {
       const tiktoken = await import('tiktoken');
-      return tiktoken.encoding_for_model('gpt-4o');
+      const enc = tiktoken.encoding_for_model('gpt-4o');
+      logo.debug('tiktoken encoder initialized');
+      return enc;
     })();
   }
   return _encoderPromise;

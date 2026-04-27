@@ -1,3 +1,5 @@
+import { LogLevel } from './lib/logo.js';
+
 export const config = {
   modelContextWindow: 100_000,
   freezeThreshold: () => config.modelContextWindow * 0.3,
@@ -16,4 +18,7 @@ export const config = {
   dataDir: 'data',
   tempDir: 'temp',
   workspaceRoot: process.cwd(),
+  logDir: 'logs',
+  logLevel: LogLevel.Info,
+  logMaxFileSize: 10 * 1024 * 1024,
 };

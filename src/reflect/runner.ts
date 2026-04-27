@@ -1,4 +1,5 @@
 import type { ReflectModule } from './types.js';
+import { logo } from '../lib/logo.js';
 
 export class ReflectRunner {
   private timers: NodeJS.Timeout[] = [];
@@ -21,7 +22,7 @@ export class ReflectRunner {
             this.taskQueue.push(task);
           }
         } catch (err) {
-          console.error(`[reflect] module ${mod.name} error:`, err);
+          logo.error('Reflect module error', { module: mod.name, error: String(err) });
         }
       }, mod.interval);
       this.timers.push(timer);
@@ -45,10 +46,10 @@ export class ReflectRunner {
         if (this.onTask) {
           await this.onTask(task);
         } else {
-          console.log(`[reflect] task: ${task}`);
+          logo.info('Reflect task', { task });
         }
       } catch (err) {
-        console.error('[reflect] task error:', err);
+        logo.error('Reflect task error', { error: String(err) });
       }
     }
     this.running = false;

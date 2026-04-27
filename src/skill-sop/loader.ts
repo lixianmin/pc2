@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'fs/promises';
 import { join } from 'path';
 import yaml from 'js-yaml';
 import type { SkillDefinition } from './types.js';
+import { logo } from '../lib/logo.js';
 
 export function parseSkillFrontmatter(content: string): Omit<SkillDefinition, 'filePath'> {
   const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
@@ -34,7 +35,9 @@ export async function scanSkillDirectory(dir: string): Promise<SkillDefinition[]
       const content = await readFile(skillPath, 'utf-8');
       const parsed = parseSkillFrontmatter(content);
       skills.push({ ...parsed, filePath: skillPath });
+      logo.debug('Skill loaded', { name: parsed.name, path: skillPath, evolvable: parsed.evolvable });
     } catch {
+      logo.warn('Skill load failed', { path: skillPath });
       continue;
     }
   }

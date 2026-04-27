@@ -3,6 +3,7 @@ import { join } from 'path';
 import { readJsonl } from './jsonl.js';
 import { getFrozenFiles, getUnprocessedSummaries } from './history.js';
 import { config } from '../config.js';
+import { logo } from '../lib/logo.js';
 
 const freezeLocks = new Map<string, Promise<boolean>>();
 
@@ -24,6 +25,7 @@ export async function checkAndFreeze(
     const frozenPath = join(threadDir, `messages-${nextNum}.jsonl`);
 
     await rename(currentFile, frozenPath);
+    logo.info('Freeze completed', { file: frozenPath, tokens, messages: messages.length });
     await writeFile(currentFile, '', 'utf-8');
     return true;
   });
@@ -56,5 +58,6 @@ export async function checkAndSummarize(
   const summaryPath = join(summariesDir, `${num}.md`);
 
   await writeFile(summaryPath, summary, 'utf-8');
+  logo.info('Summarize completed', { source: oldestFile, output: summaryPath, summary_len: summary.length });
   return summaryPath;
 }

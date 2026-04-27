@@ -1,4 +1,5 @@
 import type { MemoryHit } from '../types.js';
+import { logo } from '../lib/logo.js';
 
 export interface LmdMcpClientOptions {
   host: string;
@@ -20,6 +21,7 @@ export class LmdMcpClient {
         return await this.call(method, params);
       } catch {
         if (attempt < delays.length) {
+          logo.warn('MCP call retry', { method, attempt: attempt + 1, delay_ms: delays[attempt] });
           await new Promise(r => setTimeout(r, delays[attempt]));
         } else {
           throw new Error(`MCP call failed after ${delays.length} retries: ${method}`);
@@ -36,6 +38,7 @@ export class LmdMcpClient {
       method,
       params,
     };
+    logo.debug('MCP request', { method });
     const resp = await fetch(this.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -50,11 +53,14 @@ export class LmdMcpClient {
 
   async queryMemory(params: { query: string; limit?: number }): Promise<MemoryHit[]> {
     try {
-      return (await this.callWithRetry('tools/call', {
+      const results = (await this.callWithRetry('tools/call', {
         name: 'memory_query',
         arguments: { query: params.query, limit: params.limit ?? 5 },
       })) as MemoryHit[];
+      logo.info('Memory query', { query_len: params.query.length, hits: results.length });
+      return results;
     } catch {
+      logo.warn('Memory query failed, returning empty', { query_len: params.query.length });
       return [];
     }
   }
@@ -63,8 +69,9 @@ export class LmdMcpClient {
     const result = await this.callWithRetry('tools/call', {
       name: 'memory_add',
       arguments: { content: params.content, type: params.type },
-    });
-    return result as { id: string };
+    }) as { id: string };
+    logo.info('Memory add', { type: params.type, content_len: params.content.length, id: result.id });
+    return result;
   }
 
   async deleteMemory(params: { id: string }): Promise<void> {

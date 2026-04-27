@@ -1,5 +1,6 @@
 import { CronExpressionParser } from 'cron-parser';
 import type { ReflectModule } from './types.js';
+import { logo } from '../lib/logo.js';
 
 export interface CronJob {
   expression: string;
@@ -36,10 +37,11 @@ export function createCronSchedulerModule(
             }
           } else if (prev > last) {
             tasks.push(job.task);
+            logo.info('Cron job fired', { task: job.task, expression: job.expression });
             lastRuns.set(job.task, prev);
           }
         } catch {
-          // invalid cron expression — skip
+          logo.warn('Invalid cron expression', { expression: job.expression, task: job.task });
         }
       }
 

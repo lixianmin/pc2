@@ -12,6 +12,7 @@ import type { LmdMcpClient } from '../memory/lmd-client.js';
 import type { SkillDefinition } from '../skill-sop/types.js';
 import { join } from 'path';
 import { config } from '../config.js';
+import { logo } from '../lib/logo.js';
 
 export type AgentEvent =
   | { type: 'text'; content: string }
@@ -43,6 +44,7 @@ export class AgentLoop {
     const toolsDesc = this.registry.getToolsDescription();
     const startTime = Date.now();
     const timeoutMs = isSubAgent ? 10 * 60 * 1000 : 20 * 60 * 1000;
+    logo.info('Agent loop started', { agentId: options.agentId ?? 'main', isSubAgent, maxRounds });
 
     const systemMsg = buildSystemPrompt(toolsDesc, options.skills ?? [], options.sops ?? []);
     let messages = '';
@@ -50,6 +52,7 @@ export class AgentLoop {
 
     for (let turn = 1; turn <= maxRounds; turn++) {
       if (Date.now() - startTime > timeoutMs) {
+        logo.info('Agent loop done', { reason: 'timeout', turns: turn - 1, elapsed_ms: Date.now() - startTime });
         yield { type: 'done', reason: 'timeout' };
         return;
       }
@@ -66,11 +69,14 @@ export class AgentLoop {
       let response: ChatResponse;
       try {
         response = await b.AgentChat(fullMessages, toolsDesc);
+        logo.info('LLM response', { turn, text_len: response.text?.length ?? 0, tool_calls: response.tool_calls?.length ?? 0 });
       } catch {
+        logo.warn('LLM call failed, retrying', { turn });
         yield { type: 'warning', content: 'LLM call failed, retrying...' };
         try {
           response = await b.AgentChat(fullMessages, toolsDesc);
         } catch {
+          logo.error('Agent loop done', { reason: 'llm_error', turns: turn, elapsed_ms: Date.now() - startTime });
           yield { type: 'done', reason: 'llm_error' };
           return;
         }
@@ -96,6 +102,7 @@ export class AgentLoop {
       }
 
       if (!response.tool_calls || response.tool_calls.length === 0) {
+        logo.info('Agent loop done', { reason: 'completed', turns: turn, elapsed_ms: Date.now() - startTime });
         yield { type: 'done', reason: 'completed' };
         return;
       }
@@ -121,8 +128,11 @@ export class AgentLoop {
           workspaceRoot: config.workspaceRoot,
         };
 
+        const toolStart = Date.now();
+        logo.info('Tool call start', { turn, name: tc.name, args_len: tc.arguments.length });
         const result = await this.registry.dispatch(tc.name, args, toolCtx);
         const resultStr = typeof result === 'string' ? result : JSON.stringify((result as StepOutcome).data);
+        logo.info('Tool call done', { turn, name: tc.name, latency_ms: Date.now() - toolStart, result_len: resultStr.length });
         yield { type: 'tool_result', name: tc.name, call_id: tc.id, result: resultStr };
         messages += `[Tool Result: ${tc.name}]\n${resultStr}\n\n`;
 
@@ -135,6 +145,7 @@ export class AgentLoop {
         }
 
         if (typeof result !== 'string' && (result as StepOutcome).shouldExit) {
+          logo.info('Agent loop done', { reason: 'ask_user', turns: turn, elapsed_ms: Date.now() - startTime });
           yield { type: 'done', reason: 'ask_user' };
           return;
         }
@@ -166,10 +177,12 @@ export class AgentLoop {
         const lines = messages.split('\n');
         const keepCount = Math.max(20, Math.floor(lines.length * 0.3));
         messages = '[...earlier context truncated...]\n\n' + lines.slice(-keepCount).join('\n');
+        logo.warn('Context truncated', { removed: lines.length - keepCount, kept: keepCount, tokens: msgTokens });
         yield { type: 'warning', content: `Context truncated: removed ${lines.length - keepCount} lines to stay within token budget` };
       }
     }
 
+    logo.warn('Agent loop done', { reason: 'max_rounds', turns: maxRounds, elapsed_ms: Date.now() - startTime });
     yield { type: 'done', reason: 'max_rounds' };
   }
 }

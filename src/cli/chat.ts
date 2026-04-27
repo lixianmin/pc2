@@ -1,4 +1,5 @@
 import * as readline from 'readline';
+import { logo, LogLevel } from '../lib/logo.js';
 import { AgentLoop } from '../agent/loop.js';
 import { ToolRegistry } from '../tools/registry.js';
 import { createFileReadTool } from '../tools/file-read.js';
@@ -12,6 +13,7 @@ import { createAskUserTool } from '../tools/ask-user.js';
 import { createSpawnAgentTool } from '../tools/spawn-agent.js';
 
 export async function startChat(options: { initialTask?: string }): Promise<void> {
+  logo.init({ console: false, level: LogLevel.Info });
   const registry = new ToolRegistry();
   registry.register(createFileReadTool());
   registry.register(createFileWriteTool());
@@ -25,6 +27,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
 
   const loop = new AgentLoop(registry);
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  rl.on('close', () => { logo.close(); });
 
   const prompt = () => rl.question('\n> ', async (input) => {
     if (!input.trim()) { prompt(); return; }

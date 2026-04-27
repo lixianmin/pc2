@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { startChat } from './chat.js';
 import { config } from '../config.js';
+import { logo } from '../lib/logo.js';
 
 const program = new Command();
 
@@ -14,6 +15,7 @@ program
   .description('Start interactive chat')
   .option('--task <task>', 'Start with initial task')
   .action(async (opts) => {
+    logo.info('pc2 chat starting');
     await startChat({ initialTask: opts.task });
   });
 
@@ -23,15 +25,17 @@ reflectCmd
   .command('start')
   .description('Start reflect background (scheduler + dream + autonomous)')
   .action(async () => {
+    logo.init({ console: true });
     const { ReflectRunner } = await import('../reflect/runner.js');
     const { createAutonomousModule } = await import('../reflect/autonomous.js');
     const { createCronSchedulerModule } = await import('../reflect/scheduler.js');
 
     const runner = new ReflectRunner(
       [createAutonomousModule(), createCronSchedulerModule([])],
-      (task) => console.log(`[reflect] executing: ${task}`),
+      (task) => { logo.info('Reflect executing', { task }); },
     );
     runner.start();
+    logo.info('Reflect started');
     console.log('Reflect started. Press Ctrl+C to stop.');
     process.on('SIGINT', () => {
       runner.stop();
@@ -47,6 +51,7 @@ reflectCmd
   .command('status')
   .description('Check reflect status')
   .action(() => {
+    logo.info('Reflect status: checking...');
     console.log('Reflect status: checking...');
   });
 
@@ -59,6 +64,7 @@ memoryCmd
     const { LmdMcpClient } = await import('../memory/lmd-client.js');
     const client = new LmdMcpClient({ host: config.lmdHost, port: config.lmdPort });
     const result = await client.addMemory({ content, type: opts.type });
+    logo.info('Memory added', { id: result.id });
     console.log(`Added memory: ${result.id}`);
   });
 
@@ -68,6 +74,7 @@ memoryCmd
     const { LmdMcpClient } = await import('../memory/lmd-client.js');
     const client = new LmdMcpClient({ host: config.lmdHost, port: config.lmdPort });
     const results = await client.queryMemory({ query });
+    logo.info('Memory search results', { count: results.length });
     for (const r of results) {
       console.log(`[${r.type}] (${r.score.toFixed(2)}) ${r.content}`);
     }

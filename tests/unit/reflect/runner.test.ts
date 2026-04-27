@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ReflectRunner } from '../../../src/reflect/runner.js';
 import type { ReflectModule } from '../../../src/reflect/types.js';
+import { logo } from '../../../src/lib/logo.js';
 
 describe('ReflectRunner', () => {
   let runner: ReflectRunner;
@@ -16,7 +17,7 @@ describe('ReflectRunner', () => {
       once: false,
       async check() { throw new Error('boom'); },
     };
-    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const errorSpy = vi.spyOn(logo, 'error').mockImplementation(() => {});
     runner = new ReflectRunner([badModule]);
     runner.start();
     await new Promise(r => setTimeout(r, 100));
