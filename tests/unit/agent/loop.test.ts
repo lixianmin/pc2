@@ -121,4 +121,23 @@ describe('AgentLoop', () => {
     expect(events.some(e => e.type === 'warning' && String(e.content).includes('truncated'))).toBe(true);
     expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'completed' });
   });
+
+  it('carries conversation history across execute() calls', async () => {
+    const { b } = await import('../../../baml_client/index.js');
+    let promptCapture: string[] = [];
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (prompt: string) => {
+      promptCapture.push(prompt);
+      return { text: 'Done', tool_calls: [] };
+    });
+
+    const registry = new ToolRegistry();
+    const loop = new AgentLoop(registry);
+
+    for await (const _ of loop.execute('first question')) { /* consume */ }
+    for await (const _ of loop.execute('second question')) { /* consume */ }
+
+    expect(promptCapture[0]).toContain('[User]\nfirst question');
+    expect(promptCapture[1]).toContain('[User]\nfirst question');
+    expect(promptCapture[1]).toContain('[User]\nsecond question');
+  });
 });

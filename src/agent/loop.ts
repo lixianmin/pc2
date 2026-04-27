@@ -33,6 +33,7 @@ export interface LoopOptions {
 }
 
 export class AgentLoop {
+  private conversationHistory = '';
   constructor(private registry: ToolRegistry) {}
 
   async *execute(
@@ -47,7 +48,7 @@ export class AgentLoop {
     logo.info('Agent loop started', { agentId: options.agentId ?? 'main', isSubAgent, maxRounds });
 
     const systemMsg = buildSystemPrompt(toolsDesc, options.skills ?? [], options.sops ?? []);
-    let messages = '';
+    let messages = this.conversationHistory + `[User]\n${userMessage}\n\n`;
     let lastAssistantText = '';
     let consecutiveFailures = 0;
     let lastFailedTool: string | null = null;
@@ -55,6 +56,7 @@ export class AgentLoop {
     for (let turn = 1; turn <= maxRounds; turn++) {
       if (Date.now() - startTime > timeoutMs) {
         logo.info('Agent loop done', { reason: 'timeout', turns: turn - 1, elapsed_ms: Date.now() - startTime });
+        this.conversationHistory = messages;
         yield { type: 'done', reason: 'timeout' };
         return;
       }
@@ -79,6 +81,7 @@ export class AgentLoop {
           response = await b.AgentChat(fullMessages, toolsDesc);
         } catch {
           logo.error('Agent loop done', { reason: 'llm_error', turns: turn, elapsed_ms: Date.now() - startTime });
+          this.conversationHistory = messages;
           yield { type: 'done', reason: 'llm_error' };
           return;
         }
@@ -105,6 +108,7 @@ export class AgentLoop {
 
       if (!response.tool_calls || response.tool_calls.length === 0) {
         logo.info('Agent loop done', { reason: 'completed', turns: turn, elapsed_ms: Date.now() - startTime });
+        this.conversationHistory = messages;
         yield { type: 'done', reason: 'completed' };
         return;
       }
@@ -167,6 +171,7 @@ export class AgentLoop {
 
         if (typeof result !== 'string' && (result as StepOutcome).shouldExit) {
           logo.info('Agent loop done', { reason: 'ask_user', turns: turn, elapsed_ms: Date.now() - startTime });
+          this.conversationHistory = messages;
           yield { type: 'done', reason: 'ask_user' };
           return;
         }
@@ -211,6 +216,7 @@ export class AgentLoop {
     }
 
     logo.warn('Agent loop done', { reason: 'max_rounds', turns: maxRounds, elapsed_ms: Date.now() - startTime });
+    this.conversationHistory = messages;
     yield { type: 'done', reason: 'max_rounds' };
   }
 }
