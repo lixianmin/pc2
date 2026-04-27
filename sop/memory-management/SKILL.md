@@ -1,5 +1,5 @@
 ---
-name: Memory Management
+name: memory-management
 description: How memory is managed — LMD only through Dream
 evolvable: false
 ---

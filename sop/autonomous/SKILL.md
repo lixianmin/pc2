@@ -1,5 +1,5 @@
 ---
-name: Autonomous
+name: autonomous
 description: Autonomous mode — triggered after 30min user idle
 evolvable: false
 ---

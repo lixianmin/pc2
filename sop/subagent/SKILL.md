@@ -1,5 +1,5 @@
 ---
-name: Sub-Agent
+name: sub-agent
 description: When to use sub-agents for isolated execution
 evolvable: false
 ---

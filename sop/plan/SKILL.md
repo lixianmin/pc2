@@ -1,5 +1,5 @@
 ---
-name: Task Planning
+name: task-planning
 description: When task has 3+ dependent steps — use structured planning
 evolvable: false
 ---

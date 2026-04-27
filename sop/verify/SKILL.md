@@ -1,5 +1,5 @@
 ---
-name: Verification
+name: verification
 description: After completing any implementation — verify with tool evidence
 evolvable: false
 ---

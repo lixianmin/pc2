@@ -1,5 +1,5 @@
 ---
-name: Dream
+name: dream
 description: Memory consolidation process — summaries to LMD
 evolvable: false
 ---
