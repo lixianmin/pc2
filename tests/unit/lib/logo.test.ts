@@ -26,11 +26,11 @@ describe('Logo', () => {
     expect(content).toContain('[I] test message');
   });
 
-  it('formats timestamp as YYYY-MM-DD HH:mm:ss.SSS', async () => {
+  it('formats timestamp as ISO 8601 with T separator', async () => {
     testLogo.info('format test');
     testLogo.close();
     const content = await fs.readFile(path.join(TEST_DIR, 'info.log'), 'utf-8');
-    expect(content).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}/);
+    expect(content).toMatch(/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
   });
 
   it('includes caller file and line', async () => {

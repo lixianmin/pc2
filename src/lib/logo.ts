@@ -74,9 +74,15 @@ class RollingFileWriter {
 
 function formatTimestamp(): string {
   const now = new Date();
-  const dateStr = now.toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai', hour12: false });
-  const ms = String(now.getMilliseconds()).padStart(3, '0');
-  return `${dateStr}.${ms}`;
+  const offset = 8 * 60;
+  const local = new Date(now.getTime() + offset * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000);
+  const y = local.getFullYear();
+  const M = String(local.getMonth() + 1).padStart(2, '0');
+  const d = String(local.getDate()).padStart(2, '0');
+  const h = String(local.getHours()).padStart(2, '0');
+  const m = String(local.getMinutes()).padStart(2, '0');
+  const s = String(local.getSeconds()).padStart(2, '0');
+  return `${y}-${M}-${d}T${h}:${m}:${s}`;
 }
 
 function formatArchiveDate(): string {
