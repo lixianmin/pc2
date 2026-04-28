@@ -1,6 +1,8 @@
+import { randomBytes } from 'crypto';
 import { appendFile, readFile } from 'fs/promises';
-import { dirname } from 'path';
+import { dirname, join } from 'path';
 import { mkdir } from 'fs/promises';
+import type { Message, ToolCall } from '../types.js';
 
 export async function appendJsonl<T>(filePath: string, record: T): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
@@ -33,4 +35,18 @@ export async function countJsonlLines(filePath: string): Promise<number> {
   } catch {
     return 0;
   }
+}
+
+export async function appendMessage(
+  dir: string,
+  role: Message['role'],
+  content: string,
+  opts?: { toolCalls?: ToolCall[]; toolCallId?: string },
+): Promise<void> {
+  const id = `msg_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
+  await appendJsonl(join(dir, 'messages-current.jsonl'), {
+    id, role, content,
+    timestamp: new Date().toISOString(),
+    ...opts,
+  } satisfies Message);
 }
