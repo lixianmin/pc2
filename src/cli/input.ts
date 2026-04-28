@@ -1,4 +1,9 @@
-import * as readline from 'readline';
+import {
+  parseKeypress,
+  enableKittyProtocol,
+  disableKittyProtocol,
+  type ParsedKey,
+} from './parse-keypress.js';
 
 export function readMultiline(prompt: string): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
@@ -96,9 +101,13 @@ export function readMultiline(prompt: string): Promise<string | null> {
     function cleanup(writeBuffer: boolean): void {
       if (resolved) return;
       resolved = true;
-      stdin.removeListener('keypress', onKeypress);
+      stdin.removeListener('data', onData);
       stdin.removeListener('end', onEnd);
       stdout.removeListener('resize', onResize);
+      if (parseTimer) {
+        clearTimeout(parseTimer);
+        parseTimer = null;
+      }
       if (previousVisualLines > 1) {
         stdout.write(`\x1b[${previousVisualLines - 1}A`);
       }
@@ -107,13 +116,14 @@ export function readMultiline(prompt: string): Promise<string | null> {
         stdout.write(prompt + buffer);
       }
       stdout.write('\n');
+      disableKittyProtocol();
       if (stdin.isRaw) {
         stdin.setRawMode(false);
       }
       stdin.pause();
     }
 
-    function onKeypress(_str: string | undefined, key: readline.Key): void {
+    function onKeypress(key: ParsedKey): void {
       if (resolved) return;
 
       if (key.ctrl && key.name === 'c') {
@@ -165,6 +175,13 @@ export function readMultiline(prompt: string): Promise<string | null> {
         const start = currentLineStart();
         buffer = buffer.slice(0, start) + buffer.slice(cursorPos);
         cursorPos = start;
+        render();
+        return;
+      }
+
+      if (key.name === 'enter') {
+        buffer = buffer.slice(0, cursorPos) + '\n' + buffer.slice(cursorPos);
+        cursorPos += 1;
         render();
         return;
       }
@@ -256,12 +273,65 @@ export function readMultiline(prompt: string): Promise<string | null> {
         return;
       }
 
-      if (_str && _str.length > 0 && !key.ctrl && !key.meta) {
-        buffer = buffer.slice(0, cursorPos) + _str + buffer.slice(cursorPos);
-        cursorPos += _str.length;
+      const text =
+        key.text ??
+        (key.isPrintable
+          ? key.sequence
+          : !key.ctrl && !key.meta && key.sequence.length === 1 && key.name.length === 1
+            ? key.sequence
+            : '');
+      if (text && text.length > 0 && !key.ctrl && !key.meta) {
+        buffer = buffer.slice(0, cursorPos) + text + buffer.slice(cursorPos);
+        cursorPos += text.length;
         render();
         return;
       }
+    }
+
+    let dataBuffer = '';
+    let parseTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function processBuffer(): void {
+      parseTimer = null;
+      while (dataBuffer.length > 0) {
+        const key = parseKeypress(dataBuffer);
+        if (key.name || key.sequence) {
+          const consumed = key.sequence.length || 1;
+          dataBuffer = dataBuffer.slice(consumed);
+          onKeypress(key);
+        } else {
+          dataBuffer = dataBuffer.slice(1);
+        }
+      }
+    }
+
+    function tryProcessEsc(): void {
+      if (dataBuffer.length === 0) return;
+      if (!dataBuffer.startsWith('\x1b')) {
+        processBuffer();
+        return;
+      }
+
+      const key = parseKeypress(dataBuffer);
+      // If parseKeypress consumed the whole buffer and gave us a name, it's complete
+      if (key.name && key.sequence === dataBuffer) {
+        dataBuffer = dataBuffer.slice(key.sequence.length);
+        onKeypress(key);
+        tryProcessEsc();
+        return;
+      }
+
+      // Bare ESC or incomplete sequence — wait for more data
+      parseTimer = setTimeout(processBuffer, 10);
+    }
+
+    function onData(chunk: Buffer): void {
+      dataBuffer += chunk.toString('utf-8');
+      if (parseTimer) {
+        clearTimeout(parseTimer);
+        parseTimer = null;
+      }
+      tryProcessEsc();
     }
 
     function onEnd(): void {
@@ -275,8 +345,8 @@ export function readMultiline(prompt: string): Promise<string | null> {
 
     stdin.setRawMode(true);
     stdin.resume();
-    readline.emitKeypressEvents(stdin);
-    stdin.on('keypress', onKeypress);
+    enableKittyProtocol();
+    stdin.on('data', onData);
     stdin.on('end', onEnd);
     stdout.on('resize', onResize);
 
