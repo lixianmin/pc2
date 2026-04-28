@@ -83,12 +83,20 @@ export function readMultiline(prompt: string): Promise<string | null> {
       stdout.write(`\x1b[${cursorCol + 1}G`);
     }
 
-    function cleanup(): void {
+    function cleanup(writeBuffer: boolean): void {
       if (resolved) return;
       resolved = true;
       stdin.removeListener('keypress', onKeypress);
       stdin.removeListener('end', onEnd);
       stdout.removeListener('resize', onResize);
+      if (previousVisualLines > 0) {
+        stdout.write(`\x1b[${previousVisualLines}A`);
+      }
+      stdout.write('\x1b[J');
+      if (writeBuffer) {
+        stdout.write(prompt + buffer);
+      }
+      stdout.write('\n');
       if (stdin.isRaw) {
         stdin.setRawMode(false);
       }
@@ -99,16 +107,14 @@ export function readMultiline(prompt: string): Promise<string | null> {
       if (resolved) return;
 
       if (key.ctrl && key.name === 'c') {
-        cleanup();
-        stdout.write('\n');
+        cleanup(false);
         resolve(null);
         return;
       }
 
       if (key.ctrl && key.name === 'd') {
         if (buffer.length === 0) {
-          cleanup();
-          stdout.write('\n');
+          cleanup(false);
           resolve(null);
           return;
         }
@@ -160,8 +166,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
           render();
         } else {
           const result = buffer;
-          cleanup();
-          stdout.write('\n');
+          cleanup(true);
           resolve(result);
         }
         return;
@@ -250,7 +255,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
     }
 
     function onEnd(): void {
-      cleanup();
+      cleanup(false);
       resolve(null);
     }
 
