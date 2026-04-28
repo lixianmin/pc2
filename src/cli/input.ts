@@ -16,17 +16,19 @@ export function readMultiline(prompt: string): Promise<string | null> {
     let resolved = false;
 
     const termWidth = () => stdout.columns || 80;
+    const promptLines = prompt.split('\n');
+    const promptLastLineLen = promptLines[promptLines.length - 1].length;
 
     function visualLineCount(text: string): number {
       const tw = termWidth();
       const segments = text.split('\n');
       let count = 0;
       for (let i = 0; i < segments.length; i++) {
-        const offset = i === 0 ? prompt.length : 0;
+        const offset = i === 0 ? promptLastLineLen : 0;
         const len = segments[i].length + offset;
         count += Math.max(1, Math.ceil(len / tw));
       }
-      return count;
+      return count + (promptLines.length - 1);
     }
 
     function getLineInfo(): { row: number; col: number } {
@@ -61,13 +63,13 @@ export function readMultiline(prompt: string): Promise<string | null> {
       const tw = termWidth();
       const segments = buffer.split('\n');
 
-      const colOffset = info.row === 0 ? prompt.length : 0;
+      const colOffset = info.row === 0 ? promptLastLineLen : 0;
       const logicalCol = colOffset + info.col;
 
       const visualRowOfCursor = Math.floor(logicalCol / tw);
-      let visualLinesAbove = 0;
+      let visualLinesAbove = promptLines.length - 1;
       for (let i = 0; i < info.row; i++) {
-        const off = i === 0 ? prompt.length : 0;
+        const off = i === 0 ? promptLastLineLen : 0;
         const len = segments[i].length + off;
         visualLinesAbove += Math.max(1, Math.ceil(len / tw));
       }
