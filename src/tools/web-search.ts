@@ -1,5 +1,6 @@
 import type { Tool } from './types.js';
 import type { StepOutcome } from '../types.js';
+import { config } from '../config.js';
 
 export function createWebSearchTool(): Tool {
   return {
@@ -14,7 +15,7 @@ export function createWebSearchTool(): Tool {
     },
     async execute(args): Promise<StepOutcome> {
       try {
-        const url = `http://127.0.0.1:5001/search?q=${encodeURIComponent(args.query as string)}&format=json`;
+        const url = `${config.webSearchUrl}/search?q=${encodeURIComponent(args.query as string)}&format=json`;
         const resp = await fetch(url);
         if (!resp.ok) {
           return { data: `Search error: HTTP ${resp.status}`, nextPrompt: null, shouldExit: false };

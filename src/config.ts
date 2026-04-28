@@ -10,7 +10,7 @@ export const config = {
   antiLoopInterval: 7,
   forceAskUserTurn: 25,
   subAgentHeartbeatMs: 60 * 1000,
-  lmdPort: 58080,
+  lmdPort: 12345,
   lmdHost: 'localhost',
   cronCheckIntervalMs: 120_000,
   autonomousIdleMs: 1_800_000,
@@ -21,4 +21,5 @@ export const config = {
   logDir: 'logs',
   logLevel: LogLevel.Info,
   logMaxFileSize: 10 * 1024 * 1024,
+  webSearchUrl: process.env.WEB_SEARCH_URL ?? 'http://127.0.0.1:5001',
 };
