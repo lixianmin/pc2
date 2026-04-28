@@ -50,8 +50,8 @@ export function readMultiline(prompt: string): Promise<string | null> {
     }
 
     function render(): void {
-      if (previousVisualLines > 0) {
-        stdout.write(`\x1b[${previousVisualLines}A`);
+      if (previousVisualLines > 1) {
+        stdout.write(`\x1b[${previousVisualLines - 1}A`);
       }
       stdout.write('\x1b[J');
       stdout.write(prompt + buffer);
@@ -91,8 +91,8 @@ export function readMultiline(prompt: string): Promise<string | null> {
       stdin.removeListener('keypress', onKeypress);
       stdin.removeListener('end', onEnd);
       stdout.removeListener('resize', onResize);
-      if (previousVisualLines > 0) {
-        stdout.write(`\x1b[${previousVisualLines}A`);
+      if (previousVisualLines > 1) {
+        stdout.write(`\x1b[${previousVisualLines - 1}A`);
       }
       stdout.write('\x1b[J');
       if (writeBuffer) {
