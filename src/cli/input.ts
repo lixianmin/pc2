@@ -19,13 +19,21 @@ export function readMultiline(prompt: string): Promise<string | null> {
     const promptLines = prompt.split('\n');
     const promptLastLineLen = promptLines[promptLines.length - 1].length;
 
+    function vWidth(str: string): number {
+      let w = 0;
+      for (const ch of str) {
+        w += ch.codePointAt(0)! > 0x7f ? 2 : 1;
+      }
+      return w;
+    }
+
     function visualLineCount(text: string): number {
       const tw = termWidth();
       const segments = text.split('\n');
       let count = 0;
       for (let i = 0; i < segments.length; i++) {
         const offset = i === 0 ? promptLastLineLen : 0;
-        const len = segments[i].length + offset;
+        const len = vWidth(segments[i]) + offset;
         count += Math.max(1, Math.ceil(len / tw));
       }
       return count + (promptLines.length - 1);
@@ -35,7 +43,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
       const beforeCursor = buffer.slice(0, cursorPos);
       const lines = beforeCursor.split('\n');
       const row = lines.length - 1;
-      const col = lines[lines.length - 1].length;
+      const col = vWidth(lines[lines.length - 1]);
       return { row, col };
     }
 
@@ -70,7 +78,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
       let visualLinesAbove = promptLines.length - 1;
       for (let i = 0; i < info.row; i++) {
         const off = i === 0 ? promptLastLineLen : 0;
-        const len = segments[i].length + off;
+        const len = vWidth(segments[i]) + off;
         visualLinesAbove += Math.max(1, Math.ceil(len / tw));
       }
       visualLinesAbove += visualRowOfCursor;
