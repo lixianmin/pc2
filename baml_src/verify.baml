@@ -3,7 +3,7 @@ function VerifyJudge(
   deliverables: string,
   evidence: string
 ) -> VerifyResult {
-  client Glm5Turbo
+  client GLM
   prompt #"
     You are an adversarial verifier. Determine if the task was truly completed.
 

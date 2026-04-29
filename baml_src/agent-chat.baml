@@ -1,15 +1,43 @@
 function AgentChat(
-  messages: string,
-  tools_description: string
+  tools_description: string,
+  chat_history: string,
+  skills_list: string,
+  sops_list: string,
+  context_block: string,
+  relevant_memory: string
 ) -> ChatResponse {
-  client Glm5Turbo
+  client GLM
   prompt #"
     You are a personal AI agent. Follow your instructions and use tools when needed.
 
-    Available tools:
-    {{ tools_description }}
+    You are an AI assistant with access to tools, skills, and standard operating procedures (SOPs).
+    Follow instructions precisely. Use tools when needed. Be concise and accurate.
 
-    {{ messages }}
+    {% if tools_description %}
+    ## Tools
+    {{ tools_description }}
+    {% endif %}
+
+    {% if skills_list %}
+    ## Skills
+    {{ skills_list }}
+    {% endif %}
+
+    {% if sops_list %}
+    ## SOPs
+    {{ sops_list }}
+    {% endif %}
+
+    {{ chat_history }}
+
+    {% if context_block %}
+    {{ context_block }}
+    {% endif %}
+
+    {% if relevant_memory %}
+    ## Relevant Memory
+    {{ relevant_memory }}
+    {% endif %}
 
     {{ ctx.output_format }}
   "#
@@ -18,18 +46,33 @@ function AgentChat(
 test TestAgentChatTextOnly {
   functions [AgentChat]
   args {
-    messages #"
+    tools_description "## echo\necho input"
+    chat_history #"
       [User]
       Hello, what can you do?
     "#
-    tools_description "## echo\necho input"
+    skills_list ""
+    sops_list ""
+    context_block ""
+    relevant_memory ""
   }
 }
 
 test TestAgentChatToolCall {
   functions [AgentChat]
   args {
-    messages #"
+    tools_description #"
+      ## file_read
+      Read file contents
+      Parameters: {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}
+    "#
+    chat_history #"
+      [User]
+      Read the file /tmp/test.txt
+    "#
+    skills_list ""
+    sops_list ""
+    context_block #"
       [Context]
       Time: 2026-04-26T22:00:00+08:00
       Turn: 1
@@ -37,10 +80,6 @@ test TestAgentChatToolCall {
       [User Message]
       Read the file /tmp/test.txt
     "#
-    tools_description #"
-      ## file_read
-      Read file contents
-      Parameters: {"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}
-    "#
+    relevant_memory ""
   }
 }

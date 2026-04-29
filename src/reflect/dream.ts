@@ -6,6 +6,7 @@ import type { MemoryItem } from '../../baml_client/types.js';
 import { getUnprocessedSummaries } from '../storage/history.js';
 import { readJsonl } from '../storage/jsonl.js';
 import type { Message } from '../types.js';
+import { logo } from '../lib/logo.js';
 
 export interface DreamResult {
   processed: number;
@@ -45,7 +46,9 @@ export async function runDream(
         if (messages.length === 0) continue;
 
         const messagesText = messages.map((m) => `[${m.role}] ${m.content}`).join('\n');
+        logo.info('ExtractMemory request', { messages_count: messages.length, messages_text_len: messagesText.length });
         const memoryItems: MemoryItem[] = await b.ExtractMemory(messagesText);
+        logo.info('ExtractMemory response', { items_count: memoryItems.length, items: memoryItems });
 
         for (const item of memoryItems) {
           await lmdClient.addMemory({ content: item.content, type: item.type as 'fact' | 'episode' | 'relation' });

@@ -8,3 +8,8 @@ class ChatResponse {
   text string
   tool_calls ToolCall[]
 }
+
+class VerifyResult {
+  verdict string
+  details string
+}

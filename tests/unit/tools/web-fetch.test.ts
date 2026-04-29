@@ -109,4 +109,22 @@ describe('createWebFetchTool execute', () => {
     const result = await tool.execute({ url: 'http://127.0.0.1:3000/api' }, dummyCtx as any);
     expect(String(result.data)).toContain('URL not allowed');
   });
+
+  it('does not truncate large HTML pages below limit', async () => {
+    const originalFetch = globalThis.fetch;
+    const items = Array.from({ length: 100 }, (_, i) =>
+      `<article><h2>Repo ${i}: some-org/some-repo-name-${i}</h2><p>Description of repo ${i} with some details about what it does and why it is trending this week</p></article>`
+    ).join('\n');
+    const html = `<html><body>${items}</body></html>`;
+    globalThis.fetch = async () => new Response(html, {
+      headers: { 'content-type': 'text/html' },
+    });
+    const tool = createWebFetchTool();
+    const result = await tool.execute({ url: 'https://github.com/trending' }, dummyCtx as any);
+    const data = String(result.data);
+    expect(data).toContain('Repo 99');
+    expect(data).toContain('Repo 0');
+    expect(data.length).toBeLessThanOrEqual(50000);
+    globalThis.fetch = originalFetch;
+  });
 });

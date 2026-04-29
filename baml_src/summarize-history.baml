@@ -1,7 +1,7 @@
 function SummarizeHistory(
   messages: string
 ) -> string {
-  client Glm5Turbo
+  client GLM
   prompt #"
     Summarize this conversation segment. Cover: Tasks, Key Decisions, Code/File Changes,
     Important Information Discovered, User Preferences Expressed, Unresolved Issues.

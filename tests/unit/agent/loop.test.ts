@@ -124,9 +124,9 @@ describe('AgentLoop', () => {
 
   it('resumeHistory injects prior history into prompt', async () => {
     const { b } = await import('../../../baml_client/index.js');
-    let capturedPrompt = '';
-    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (prompt: string) => {
-      capturedPrompt = prompt;
+    let capturedHistory = '';
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (_tools: string, history: string) => {
+      capturedHistory = history;
       return { text: 'Done', tool_calls: [] };
     });
 
@@ -136,9 +136,9 @@ describe('AgentLoop', () => {
 
     for await (const _ of loop.execute('new question')) { /* consume */ }
 
-    expect(capturedPrompt).toContain('previous question');
-    expect(capturedPrompt).toContain('previous answer');
-    expect(capturedPrompt).toContain('[User]\nnew question');
+    expect(capturedHistory).toContain('previous question');
+    expect(capturedHistory).toContain('previous answer');
+    expect(capturedHistory).toContain('[User]\nnew question');
   });
 
   it('persists user messages to JSONL when threadDir is set', async () => {
@@ -164,9 +164,9 @@ describe('AgentLoop', () => {
 
   it('carries conversation history across execute() calls', async () => {
     const { b } = await import('../../../baml_client/index.js');
-    let promptCapture: string[] = [];
-    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (prompt: string) => {
-      promptCapture.push(prompt);
+    let historyCapture: string[] = [];
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (_tools: string, history: string) => {
+      historyCapture.push(history);
       return { text: 'Done', tool_calls: [] };
     });
 
@@ -176,8 +176,8 @@ describe('AgentLoop', () => {
     for await (const _ of loop.execute('first question')) { /* consume */ }
     for await (const _ of loop.execute('second question')) { /* consume */ }
 
-    expect(promptCapture[0]).toContain('[User]\nfirst question');
-    expect(promptCapture[1]).toContain('[User]\nfirst question');
-    expect(promptCapture[1]).toContain('[User]\nsecond question');
+    expect(historyCapture[0]).toContain('[User]\nfirst question');
+    expect(historyCapture[1]).toContain('[User]\nfirst question');
+    expect(historyCapture[1]).toContain('[User]\nsecond question');
   });
 });

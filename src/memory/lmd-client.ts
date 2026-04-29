@@ -45,18 +45,24 @@ export class LmdMcpClient {
       body: JSON.stringify(body),
     });
     if (!resp.ok) throw new Error(`MCP HTTP ${resp.status}`);
-    const json = (await resp.json()) as { result?: { content?: { text?: string }[] }; error?: { message: string } };
+    const json = (await resp.json()) as { result?: unknown; error?: { message: string } };
     if (json.error) throw new Error(`MCP error: ${json.error.message}`);
-    const textContent = json.result?.content?.[0]?.text;
-    return textContent ? JSON.parse(textContent) : null;
+    return json.result ?? null;
   }
 
   async queryMemory(params: { query: string; limit?: number }): Promise<MemoryHit[]> {
     try {
-      const results = (await this.callWithRetry('tools/call', {
+      const raw = (await this.callWithRetry('tools/call', {
         name: 'memory_query',
         arguments: { query: params.query, limit: params.limit ?? 5 },
-      })) as MemoryHit[];
+      })) as Array<{ id: number; content: string; type: string; score: number; created_at: string }>;
+      const results: MemoryHit[] = raw.map(r => ({
+        id: String(r.id),
+        content: r.content,
+        type: r.type as MemoryHit['type'],
+        score: r.score,
+        createdAt: r.created_at,
+      }));
       logo.info('Memory query', { query_len: params.query.length, hits: results.length });
       return results;
     } catch {
@@ -66,12 +72,13 @@ export class LmdMcpClient {
   }
 
   async addMemory(params: { content: string; type: 'fact' | 'episode' | 'relation' }): Promise<{ id: string }> {
-    const result = await this.callWithRetry('tools/call', {
+    const raw = (await this.callWithRetry('tools/call', {
       name: 'memory_add',
       arguments: { content: params.content, type: params.type },
-    }) as { id: string };
-    logo.info('Memory add', { type: params.type, content_len: params.content.length, id: result.id });
-    return result;
+    })) as { id: number };
+    const id = String(raw.id);
+    logo.info('Memory add', { type: params.type, content_len: params.content.length, id });
+    return { id };
   }
 
   async deleteMemory(params: { id: string }): Promise<void> {

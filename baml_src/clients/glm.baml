@@ -1,4 +1,13 @@
 
+client<llm> GLM {
+  provider openai
+  retry_policy Exponential
+  options {
+    model "glm-5.1"
+    api_key env.GLM_API_KEY
+    base_url env.GLM_BASE_URL
+  }
+}
 
 client<llm> GLM47 {
   provider openai
@@ -10,7 +19,7 @@ client<llm> GLM47 {
   }
 }
 
-client<llm> Glm5Turbo {
+client<llm> GLM5Turbo {
   provider openai
   retry_policy Exponential
   options {
@@ -21,7 +30,7 @@ client<llm> Glm5Turbo {
 }
 
 
-client<llm> Glm51 {
+client<llm> GLM51 {
   provider openai
   retry_policy Exponential
   options {

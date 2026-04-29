@@ -13,6 +13,8 @@ import { createWebFetchTool } from '../../src/tools/web-fetch.js';
 import { createMemorySearchTool } from '../../src/tools/memory-search.js';
 import { createAskUserTool } from '../../src/tools/ask-user.js';
 import { createSpawnAgentTool } from '../../src/tools/spawn-agent.js';
+import type { LmdMcpClient } from '../../src/memory/lmd-client.js';
+import type { MemoryHit } from '../../src/types.js';
 
 vi.mock('../../baml_client/index.js', () => ({
   b: {
@@ -61,10 +63,10 @@ describe('integration: chat flow', () => {
 
   it('multi-turn: carries history and JSONL persists', async () => {
     const { b } = await import('../../baml_client/index.js');
-    const promptCapture: string[] = [];
-    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (prompt: string) => {
-      promptCapture.push(prompt);
-      if (promptCapture.length === 1) {
+    const historyCapture: string[] = [];
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (_tools: string, history: string) => {
+      historyCapture.push(history);
+      if (historyCapture.length === 1) {
         return {
           text: 'Found: Project A and Project B.',
           tool_calls: [{ name: 'bash', arguments: '{"command":"echo hello"}', id: 'tc_1' }],
@@ -83,9 +85,9 @@ describe('integration: chat flow', () => {
     expect(events1[events1.length - 1]).toEqual({ type: 'done', reason: 'completed' });
     expect(events2[events2.length - 1]).toEqual({ type: 'done', reason: 'completed' });
 
-    expect(promptCapture[2]).toContain('[User]\nfind top 2 projects');
-    expect(promptCapture[2]).toContain('[User]\nwhat is the second project?');
-    expect(promptCapture[2]).toContain('Project A and Project B');
+    expect(historyCapture[2]).toContain('[User]\nfind top 2 projects');
+    expect(historyCapture[2]).toContain('[User]\nwhat is the second project?');
+    expect(historyCapture[2]).toContain('Project A and Project B');
 
     const jsonlPath = join(threadDir, 'messages-current.jsonl');
     expect(existsSync(jsonlPath)).toBe(true);
@@ -98,8 +100,8 @@ describe('integration: chat flow', () => {
 
   it('memory_search returns graceful message when LMD unavailable', async () => {
     const { b } = await import('../../baml_client/index.js');
-    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (prompt: string) => {
-      if (prompt.includes('first_call')) {
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (_tools: string, history: string) => {
+      if (history.includes('first_call')) {
         return {
           text: 'Let me search memory.',
           tool_calls: [{ name: 'memory_search', arguments: '{"query":"test"}', id: 'tc_1' }],
@@ -214,5 +216,52 @@ describe('integration: chat flow', () => {
     const warningEvents = events.filter(e => e.type === 'warning' && String(e.content).includes('Anti-Loop'));
     expect(warningEvents.length).toBeGreaterThan(0);
     expect(events[events.length - 1].type).toBe('done');
+  });
+
+  it('passes LMD memory hits as relevantMemory to BAML', async () => {
+    const { b } = await import('../../baml_client/index.js');
+    let capturedArgs: string[] = [];
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(
+      async (tools: string, history: string, skills: string, sops: string, context: string, memory: string) => {
+        capturedArgs = [tools, history, skills, sops, context, memory];
+        return { text: 'Got it.', tool_calls: [] };
+      },
+    );
+
+    const memoryHits: MemoryHit[] = [
+      { id: 'm1', content: 'user prefers dark mode', type: 'fact', score: 0.92, createdAt: '2026-01-01' },
+      { id: 'm2', content: 'deployed v2 yesterday', type: 'episode', score: 0.75, createdAt: '2026-01-02' },
+    ];
+    const mockLmd = {
+      queryMemory: vi.fn().mockResolvedValue(memoryHits),
+      addMemory: vi.fn(),
+      deleteMemory: vi.fn(),
+    } as unknown as LmdMcpClient;
+
+    const registry = makeRegistry();
+    const loop = new AgentLoop(registry);
+    await collectEvents(loop, 'config question', { lmdClient: mockLmd, dataDir: tempDir });
+
+    expect(mockLmd.queryMemory).toHaveBeenCalledWith({ query: 'config question' });
+    expect(capturedArgs[5]).toContain('user prefers dark mode');
+    expect(capturedArgs[5]).toContain('deployed v2 yesterday');
+    expect(capturedArgs[5]).toContain('score: 0.92');
+  });
+
+  it('passes empty relevantMemory when lmdClient is not provided', async () => {
+    const { b } = await import('../../baml_client/index.js');
+    let capturedMemory = 'NOT_CAPTURED';
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(
+      async (_tools: string, _history: string, _skills: string, _sops: string, _context: string, memory: string) => {
+        capturedMemory = memory;
+        return { text: 'Done.', tool_calls: [] };
+      },
+    );
+
+    const registry = makeRegistry();
+    const loop = new AgentLoop(registry);
+    await collectEvents(loop, 'hello');
+
+    expect(capturedMemory).toBe('');
   });
 });

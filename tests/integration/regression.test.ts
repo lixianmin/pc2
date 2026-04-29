@@ -14,19 +14,14 @@ vi.mock('../../baml_client/index.js', () => ({
   },
 }));
 
-describe('regression: timezone in thread dir', () => {
-  it('uses Asia/Shanghai timezone, not UTC', () => {
+describe('regression: thread dir naming', () => {
+  it('uses sequential numeric names', () => {
     const dir = makeThreadDir();
-    const tsPart = dir.split('/').pop()!;
-
-    const now = new Date();
-    const utcHour = now.getUTCHours();
-    const cstHour = (utcHour + 8) % 24;
-
-    const hourInDir = parseInt(tsPart.split('-')[3], 10);
-
-    expect(hourInDir).toBe(cstHour);
-    expect(hourInDir).not.toBe(utcHour);
+    const name = dir.split('/').pop()!;
+    const n = parseInt(name, 10);
+    expect(isNaN(n)).toBe(false);
+    expect(String(n)).toBe(name);
+    expect(n).toBeGreaterThan(0);
   });
 });
 

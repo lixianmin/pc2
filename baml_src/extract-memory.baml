@@ -1,7 +1,7 @@
 function ExtractMemory(
   conversation: string
 ) -> MemoryItem[] {
-  client Glm5Turbo
+  client GLM
   prompt #"
     Extract knowledge with long-term value from this conversation.
     Types: fact (immutable truth), episode (time-sensitive event), relation (currently-true relationship).
