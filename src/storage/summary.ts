@@ -21,7 +21,7 @@ export async function checkAndFreeze(
     if (tokens < config.freezeThreshold()) return false;
 
     const frozenFiles = await getFrozenFiles(threadDir);
-    const nextNum = String(frozenFiles.length + 1).padStart(3, '0');
+    const nextNum = String(frozenFiles.length + 1).padStart(3, '0'); // 3-digit zero-padded: supports up to 999 frozen segments before overflow
     const frozenPath = join(threadDir, `messages-${nextNum}.jsonl`);
 
     await rename(currentFile, frozenPath);
@@ -38,7 +38,7 @@ export async function checkAndSummarize(
   summarizeFn?: (messages: string) => Promise<string>,
 ): Promise<string | null> {
   const frozenFiles = await getFrozenFiles(threadDir);
-  if (frozenFiles.length < 3) return null;
+  if (frozenFiles.length < 3) return null; // need at least 3 frozen files so summarization has enough material to be worthwhile
 
   const unprocessed = await getUnprocessedSummaries(threadDir);
   if (unprocessed.length > 0) return null;

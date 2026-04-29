@@ -203,4 +203,21 @@ describe('turnEndCallback', () => {
     expect(result).toContain('file_edit');
     expect(result).not.toContain('Warning');
   });
+
+  it('completion claim fires at turn 30 (between safety and danger thresholds)', () => {
+    const ctx: CallbackContext = {
+      ...baseCtx,
+      planFile: '/plan.md',
+      lastResponse: 'task complete',
+      hasVerificationEvidence: false,
+    };
+    const result = turnEndCallback(30, ctx);
+    expect(result).toContain('Blocked');
+  });
+
+  it('plan reminder fires at turn 15 with plan file', () => {
+    const ctx: CallbackContext = { ...baseCtx, planFile: '/plan.md' };
+    const result = turnEndCallback(15, ctx);
+    expect(result).toContain('Plan Reminder');
+  });
 });

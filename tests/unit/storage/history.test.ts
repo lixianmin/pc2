@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import fs from 'fs/promises';
 import path from 'path';
-import { getFrozenFiles, getCurrentFile, getBridgeFile } from '../../../src/storage/history.js';
+import { getFrozenFiles, getCurrentFile } from '../../../src/storage/history.js';
 import { appendJsonl } from '../../../src/storage/jsonl.js';
 import type { Message } from '../../../src/types.js';
 
@@ -31,19 +31,5 @@ describe('history', () => {
     const frozen = await getFrozenFiles(THREAD_DIR);
     expect(frozen).toHaveLength(2);
     expect(frozen[0]).toMatch(/messages-001\.jsonl$/);
-  });
-
-  it('getBridgeFile returns second-to-last frozen file', async () => {
-    await appendJsonl(path.join(THREAD_DIR, 'messages-001.jsonl'), makeMsg('1', 'a'));
-    await appendJsonl(path.join(THREAD_DIR, 'messages-002.jsonl'), makeMsg('2', 'b'));
-    await appendJsonl(path.join(THREAD_DIR, 'messages-003.jsonl'), makeMsg('3', 'c'));
-    const bridge = await getBridgeFile(THREAD_DIR);
-    expect(bridge).toMatch(/messages-002\.jsonl$/);
-  });
-
-  it('getBridgeFile returns null when fewer than 2 frozen files', async () => {
-    await appendJsonl(path.join(THREAD_DIR, 'messages-001.jsonl'), makeMsg('1', 'a'));
-    const bridge = await getBridgeFile(THREAD_DIR);
-    expect(bridge).toBeNull();
   });
 });

@@ -60,7 +60,7 @@ export const logo: Logo;   // singleton
 ```
 
 字段说明：
-- **时间**：`YYYY-MM-DD HH:mm:ss.SSS`，UTC+8（遵循 AGENTS.md 时区规则）
+- **时间**：`YYYY-MM-DDTHH:mm:ss`，UTC+8（遵循 AGENTS.md 时区规则，T 分隔符无毫秒）
 - **调用位置**：`filename:line`，从 `Error.stack` 提取，跳过 `logo.ts` 自身帧
 - **级别**：`[D]` `[I]` `[W]` `[E]`
 - **消息**：msg 参数 + args 序列化拼接
@@ -190,7 +190,7 @@ class RollingFileWriter {
 }
 ```
 
-注意：不使用 `dayjs`，直接用 `new Date().toLocaleString('sv-SE', { timeZone: 'Asia/Shanghai' })` 格式化日期。`sv-SE` locale 产生 `YYYY-MM-DD HH:mm:ss` 格式。
+注意：不使用 `dayjs`，直接手动构造 UTC+8 时间字符串，格式 `YYYY-MM-DDTHH:mm:ss`。
 
 ## 6. Console 行为
 
@@ -295,7 +295,7 @@ if (options.threadDir) {
 
 ### 8.1 单元测试（`tests/unit/lib/logo.test.ts`）
 
-- 格式化输出匹配 `YYYY-MM-DD HH:mm:ss.SSS filename:line [X] message` 正则
+- 格式化输出匹配 `YYYY-MM-DDTHH:mm:ss filename:line [X] message` 正则
 - 级别过滤：`level=Warn` 时 debug/info 不写入
 - 级联写入：error 调用写入 3 个文件，warn 写入 2 个
 - Rolling：mock 文件大小超过阈值后归档

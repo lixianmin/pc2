@@ -11,6 +11,7 @@ export function isUrlAllowed(urlStr: string): boolean {
     const parsed = new URL(urlStr);
     const host = parsed.hostname;
     if (BLOCKED_HOSTS.includes(host)) return false;
+    // RFC 1918/RFC 6598 private IPv4 ranges: 10/8, 172.16-31/16, 192.168/16 — block to prevent SSRF
     if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(host)) return false;
     return true;
   } catch {
@@ -47,14 +48,13 @@ export function createWebFetchTool(): Tool {
         const contentType = resp.headers.get('content-type') ?? '';
         const text = await resp.text();
 
-        const MAX_JSON = 50000;
-        const MAX_HTML = 20000;
+        const MAX_SIZE = 50000; // ~50K chars balances detail vs LLM context window; covers most useful web pages
 
         let result: string;
         if (contentType.includes('application/json') || contentType.includes('text/plain') || text.trimStart().startsWith('{') || text.trimStart().startsWith('[')) {
-          result = text.slice(0, MAX_JSON);
+          result = text.slice(0, MAX_SIZE);
         } else {
-          result = extractTextFromHtml(text).slice(0, MAX_HTML);
+          result = extractTextFromHtml(text).slice(0, MAX_SIZE);
         }
 
         return { data: result, nextPrompt: null, shouldExit: false };

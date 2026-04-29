@@ -24,10 +24,10 @@ export function createWebSearchTool(): Tool {
         if (!data.results || data.results.length === 0) {
           return { data: 'No results found.', nextPrompt: null, shouldExit: false };
         }
-        const formatted = data.results.slice(0, 8).map((r, i) => {
+        const formatted = data.results.slice(0, 8).map((r, i) => { // top 8 results: enough coverage without flooding context
           const snippet = r.snippet ?? r.content ?? '';
           const cleanSnippet = snippet.replace(/<[^>]*>/g, '').trim();
-          return `${i + 1}. ${r.title}\n   ${r.href}\n   ${cleanSnippet.slice(0, 300)}`;
+          return `${i + 1}. ${r.title}\n   ${r.href}\n   ${cleanSnippet.slice(0, 300)}`; // 300 chars: concise snippet that preserves key info
         }).join('\n\n');
         return { data: formatted, nextPrompt: null, shouldExit: false };
       } catch (err: unknown) {

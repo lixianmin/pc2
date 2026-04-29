@@ -8,7 +8,7 @@ const program = new Command();
 program
   .name('pc2')
   .description('Personal AI Agent')
-  .version('0.1.0');
+  .version('1.0.0');
 
 program
   .command('chat')
@@ -39,20 +39,14 @@ reflectCmd
     console.log('Reflect started. Press Ctrl+C to stop.');
     process.on('SIGINT', () => {
       runner.stop();
+      logo.close();
       process.exit(0);
     });
     process.on('SIGTERM', () => {
       runner.stop();
+      logo.close();
       process.exit(0);
     });
-  });
-
-reflectCmd
-  .command('status')
-  .description('Check reflect status')
-  .action(() => {
-    logo.info('Reflect status: checking...');
-    console.log('Reflect status: checking...');
   });
 
 const memoryCmd = program.command('memory').description('Memory operations');

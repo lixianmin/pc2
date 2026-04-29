@@ -377,4 +377,242 @@ describe('readMultiline', () => {
     const result = await promise;
     expect(result).toBe('a');
   });
+
+  it('slash character is accepted as input', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    emitKey(stdin, key('/'));
+    emitKey(stdin, key('s'));
+    emitKey(stdin, key('e'));
+    emitKey(stdin, key('s'));
+    emitKey(stdin, key('s'));
+    emitKey(stdin, key('i'));
+    emitKey(stdin, key('o'));
+    emitKey(stdin, key('n'));
+    emitKey(stdin, key('s'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('/sessions');
+  });
+
+  it.each([
+    ['!', '!cmd'],
+    ['@', '@user'],
+    ['#', '#tag'],
+    ['$', '$var'],
+    ['%', '100%'],
+    ['^', 'x^2'],
+    ['&', 'a&b'],
+    ['*', '2*x'],
+    ['(', '(x)'],
+    [')', '(x)'],
+    ['-', 'a-b'],
+    ['_', '_var'],
+    ['=', 'x=1'],
+    ['+', '1+1'],
+    ['[', 'arr[0]'],
+    [']', 'arr[0]'],
+    ['{', '{key}'],
+    ['}', '{key}'],
+    [';', 'a;b'],
+    [':', 'key:val'],
+    ["'", "it's"],
+    ['"', '"hi"'],
+    [',', 'a,b'],
+    ['<', '<tag>'],
+    ['>', '<tag>'],
+    ['?', 'ok?'],
+    ['~', '~home'],
+    ['`', '`code`'],
+    ['\\', 'a\\b'],
+    ['|', 'a|b'],
+  ])('symbol %s in input yields %s', async (symbol, expected) => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    for (const ch of expected) {
+      if (ch === '\n') {
+        emitKey(stdin, key('return', { shift: true }));
+      } else {
+        emitKey(stdin, key(ch));
+      }
+    }
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe(expected);
+  });
+
+  it('space is accepted as input', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    emitKey(stdin, key('h'));
+    emitKey(stdin, key('e'));
+    emitKey(stdin, key('l'));
+    emitKey(stdin, key('l'));
+    emitKey(stdin, key('o'));
+    emitKey(stdin, key(' '));
+    emitKey(stdin, key('w'));
+    emitKey(stdin, key('o'));
+    emitKey(stdin, key('r'));
+    emitKey(stdin, key('l'));
+    emitKey(stdin, key('d'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('hello world');
+  });
+
+  it('numbers are accepted as input', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    emitKey(stdin, key('4'));
+    emitKey(stdin, key('2'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('42');
+  });
+
+  it('multi-char chunk (paste or fast typing) is handled correctly', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    stdin.emit('data', Buffer.from('hello world'));
+    await tick();
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('hello world');
+  });
+
+  it('multi-char chunk with symbols', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    stdin.emit('data', Buffer.from('/sessions'));
+    await tick();
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('/sessions');
+  });
+
+  it('multi-char chunk with mixed content', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    stdin.emit('data', Buffer.from('x=1+2*3'));
+    await tick();
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('x=1+2*3');
+  });
+
+  it('ESC sequence in multi-char chunk: arrow key after text', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    emitKey(stdin, key('a'));
+    emitKey(stdin, key('b'));
+    emitKey(stdin, key('left'));
+    emitKey(stdin, key('x'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('axb');
+  });
+
+  it('Ghostty Shift+Enter (CSI 27;2;13~) inserts newline', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    emitKey(stdin, key('a'));
+    stdin.emit('data', Buffer.from('\x1b[27;2;13~'));
+    await tick();
+    emitKey(stdin, key('b'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('a\nb');
+  });
+
+  it('CSI 13;2~ (tilde-format Shift+Enter) inserts newline', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    emitKey(stdin, key('a'));
+    stdin.emit('data', Buffer.from('\x1b[13;2~'));
+    await tick();
+    emitKey(stdin, key('b'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('a\nb');
+  });
 });

@@ -1,3 +1,5 @@
+import { config } from '../config.js';
+
 export interface CallbackContext {
   planFile: string | null;
   lastResponse: string;
@@ -21,28 +23,33 @@ function isCompletionClaim(text: string): boolean {
 }
 
 export function turnEndCallback(turn: number, ctx: CallbackContext): string | null {
-  if (ctx.consecutiveFailures >= 3 && ctx.lastFailedTool) {
+  // Priority 1: consecutive tool failures — most urgent anti-loop signal
+  if (ctx.consecutiveFailures >= config.antiLoopThreshold && ctx.lastFailedTool) {
     return `[Anti-Loop] Tool "${ctx.lastFailedTool}" has failed ${ctx.consecutiveFailures} times consecutively. You MUST use a completely different approach or use ask_user to ask for guidance. Do NOT call ${ctx.lastFailedTool} again.`;
   }
 
-  if (turn > 0 && turn % 7 === 0) {
+  // Priority 2: periodic anti-loop check
+  if (turn > 0 && turn % config.antiLoopInterval === 0) {
     return `[Anti-Loop Warning] Turn ${turn}: you may be repeating a failed approach. Change strategy.`;
   }
 
-  if (turn >= 60) {
-    return `[DANGER] Turn ${turn} — extremely long execution. Use ask_user to report progress and confirm continuation.`;
-  }
-
-  if (turn > 25) {
-    return `[Safety] Turn ${turn} exceeds safe limit. Use ask_user to report progress and ask if you should continue.`;
-  }
-
+  // Priority 3: specific checks (plan/completion) before generic safety — these are more actionable
   if (ctx.planFile && isCompletionClaim(ctx.lastResponse) && !ctx.hasVerificationEvidence) {
     return `[Blocked] Completion claimed without verification. spawn_agent to run independent verification first.`;
   }
 
   if (ctx.planFile && turn >= 10 && turn % 5 === 0) {
     return `[Plan Reminder] file_read(${ctx.planFile}) — check current step, continue execution.`;
+  }
+
+  // Priority 4: hard danger limit
+  if (turn >= config.dangerTurnThreshold) {
+    return `[DANGER] Turn ${turn} — extremely long execution. Use ask_user to report progress and confirm continuation.`;
+  }
+
+  // Priority 5: generic safety — catch-all for high turn counts
+  if (turn > config.forceAskUserTurn) {
+    return `[Safety] Turn ${turn} exceeds safe limit. Use ask_user to report progress and ask if you should continue.`;
   }
 
   return null;

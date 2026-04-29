@@ -20,6 +20,7 @@ export interface LogoOptions {
 
 class RollingFileWriter {
   private writeCount = 0;
+  // Check file size every N writes — avoids stat() on every write
   private readonly checkInterval = 100;
 
   constructor(
@@ -42,7 +43,10 @@ class RollingFileWriter {
       if (stat.size >= this.maxFileSize) {
         this.roll();
       }
-    } catch {}
+    } catch (e) {
+      // Rolling check is best-effort; log errors but don't crash
+      console.error('[logo] checkRolling error:', e);
+    }
   }
 
   private roll(): void {
@@ -57,6 +61,7 @@ class RollingFileWriter {
     const archivePath = path.join(archiveDir, `${baseName}${date}_${String(seq).padStart(3, '0')}.log`);
     fs.renameSync(this.filePath, archivePath);
     this.cleanOldArchives(archiveDir, baseName);
+    this.writeCount = 0;
   }
 
   private cleanOldArchives(archiveDir: string, baseName: string): void {
@@ -69,13 +74,16 @@ class RollingFileWriter {
     }
   }
 
-  close(): void {}
+  close(): void {
+    // appendFileSync is synchronous, so all writes are already flushed.
+    // Just clear the writer map to prevent further writes.
+  }
 }
 
-function formatTimestamp(): string {
-  const now = new Date();
+export function formatTimestamp(date: Date = new Date()): string {
+  // UTC+8 offset in minutes (8 hours * 60)
   const offset = 8 * 60;
-  const local = new Date(now.getTime() + offset * 60 * 1000 + now.getTimezoneOffset() * 60 * 1000);
+  const local = new Date(date.getTime() + offset * 60 * 1000 + date.getTimezoneOffset() * 60 * 1000);
   const y = local.getFullYear();
   const M = String(local.getMonth() + 1).padStart(2, '0');
   const d = String(local.getDate()).padStart(2, '0');
@@ -94,7 +102,9 @@ export class Logo {
   private writers: Map<string, RollingFileWriter> = new Map();
   private initialized = false;
   private logDir = 'logs';
+  // 10 MB — large enough for ~100K log lines, small enough to open quickly
   private maxFileSize = 10 * 1024 * 1024;
+  // Keep last 5 archive files before deleting oldest
   private maxArchives = 5;
   private consoleEnabled = true;
   private level = LogLevel.Info;

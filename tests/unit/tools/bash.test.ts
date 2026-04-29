@@ -18,6 +18,19 @@ describe('bash tool', () => {
       expect(isReadOnlyCommand('npm install')).toBe(false);
       expect(isReadOnlyCommand('curl http://evil.com')).toBe(false);
     });
+
+    it('blocks shell metacharacter chaining', () => {
+      expect(isReadOnlyCommand('ls; rm -rf /')).toBe(false);
+      expect(isReadOnlyCommand('cat file && rm file')).toBe(false);
+      expect(isReadOnlyCommand('echo hello | cat')).toBe(false);
+      expect(isReadOnlyCommand('echo $(cat /etc/passwd)')).toBe(false);
+      expect(isReadOnlyCommand('ls `rm -rf /`')).toBe(false);
+    });
+
+    it('blocks echo with redirection', () => {
+      expect(isReadOnlyCommand('echo foo > file')).toBe(false);
+      expect(isReadOnlyCommand('echo foo >> file')).toBe(false);
+    });
   });
 
   it('executes a read-only command and returns output', async () => {
@@ -42,8 +55,8 @@ describe('bash tool', () => {
   describe('approval wiring', () => {
     it('auto-executes read-only commands without autoApprove', async () => {
       const tool = createBashTool({ autoApprove: false });
-      const result = await tool.execute({ command: 'echo hello' }, dummyCtx as any);
-      expect(String(result.data)).toContain('hello');
+      const result = await tool.execute({ command: 'pwd' }, dummyCtx as any);
+      expect(String(result.data)).not.toContain('requires approval');
     });
 
     it('rejects non-read-only command when autoApprove is false', async () => {

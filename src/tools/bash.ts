@@ -8,15 +8,15 @@ const execAsync = promisify(exec);
 const READ_ONLY_COMMANDS = [
   'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'diff', 'stat', 'du',
   'git status', 'git log', 'git diff', 'git branch', 'git show', 'git remote',
-  'echo', 'pwd', 'which', 'env', 'printenv', 'node -e', 'npx tsc --noEmit',
+  'pwd', 'which', 'env', 'printenv', 'node -e', 'npx tsc --noEmit',
 ];
 
-const BLOCKED_COMMANDS: string[] = [];
+const SHELL_METACHARACTERS = /[;&|`$()><!#~]/;
 
 export function isReadOnlyCommand(cmd: string): boolean {
-  const base = cmd.trim().split(/\s+/)[0];
-  if (BLOCKED_COMMANDS.includes(base)) return false;
-  return READ_ONLY_COMMANDS.some((ro) => cmd.trim().startsWith(ro));
+  const trimmed = cmd.trim();
+  if (SHELL_METACHARACTERS.test(trimmed)) return false;
+  return READ_ONLY_COMMANDS.some((ro) => trimmed.startsWith(ro));
 }
 
 export interface BashToolOptions {
@@ -37,16 +37,13 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
     },
     async execute(args): Promise<StepOutcome> {
       const cmd = args.command as string;
-      if (BLOCKED_COMMANDS.some((b) => cmd.trim().startsWith(b))) {
-        return { data: `Blocked command: ${cmd}. Use web_fetch instead.`, nextPrompt: null, shouldExit: false };
-      }
       if (!opts.autoApprove && !isReadOnlyCommand(cmd)) {
         return { data: `Command requires approval: ${cmd}. Set autoApprove or use a read-only alternative.`, nextPrompt: null, shouldExit: false };
       }
       try {
         const { stdout, stderr } = await execAsync(cmd, {
           cwd: opts.cwd,
-          timeout: 30_000,
+          timeout: 30_000, // 30s: balance between allowing slow commands and preventing hangs
         });
         const output = stdout + (stderr ? `\n[stderr]\n${stderr}` : '');
         return { data: output, nextPrompt: null, shouldExit: false };

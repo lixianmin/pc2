@@ -1,6 +1,6 @@
 import { mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
-import { logo, LogLevel } from '../lib/logo.js';
+import { logo, formatTimestamp } from '../lib/logo.js';
 import { AgentLoop } from '../agent/loop.js';
 import { ToolRegistry } from '../tools/registry.js';
 import { createFileReadTool } from '../tools/file-read.js';
@@ -38,7 +38,7 @@ export function makeThreadDir(): string {
 }
 
 export async function startChat(options: { initialTask?: string }): Promise<void> {
-  logo.init({ console: false, level: LogLevel.Info });
+  logo.init({ console: false });
   const registry = new ToolRegistry();
   registry.register(createFileReadTool());
   registry.register(createFileWriteTool());
@@ -62,10 +62,10 @@ export async function startChat(options: { initialTask?: string }): Promise<void
     const dir = makeThreadDir();
     writeMeta(dir, {
       id: dir.split('/').pop()!,
-      createdAt: new Date().toISOString(),
-      lastActivityAt: new Date().toISOString(),
+      createdAt: formatTimestamp(),
+      lastActivityAt: formatTimestamp(),
       messageCount: 0,
-      preview: preview.length > 80 ? preview.slice(0, 80) : preview,
+      preview: preview.length > 80 ? preview.slice(0, 80) : preview, // 80 chars: fits one terminal line
     });
     activeThreadDir = dir;
     logo.info('New thread created', { dir });
@@ -82,8 +82,8 @@ export async function startChat(options: { initialTask?: string }): Promise<void
     }
     const choices = threads.map((t, i) => {
       const shortDate = t.lastActivityAt.slice(5, 16).replace('T', ' ');
-      const preview = t.preview
-        ? (t.preview.length > 50 ? t.preview.slice(0, 50) + '...' : t.preview)
+        const preview = t.preview
+          ? (t.preview.length > 50 ? t.preview.slice(0, 50) + '...' : t.preview) // 50 chars: compact display for session list
         : '(empty)';
       return {
         name: `#${i + 1}  ${shortDate}  ${preview}`,
@@ -146,7 +146,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
           textYielded = true;
           process.stdout.write(event.content);
         } else if (event.type === 'tool_result') {
-          process.stdout.write(`\n[tool: ${event.name}] ${String(event.result).slice(0, 200)}\n`);
+          process.stdout.write(`\n[tool: ${event.name}] ${String(event.result).slice(0, 200)}\n`); // 200 chars: enough to see result summary
         } else if (event.type === 'warning') {
           process.stdout.write(`\n[warning] ${event.content}\n`);
         } else if (event.type === 'done') {
@@ -159,7 +159,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
 
       const meta = await readMeta(threadDir);
       await updateMeta(threadDir, {
-        lastActivityAt: new Date().toISOString(),
+        lastActivityAt: formatTimestamp(),
         messageCount: (meta?.messageCount ?? 0) + 1,
       });
     }

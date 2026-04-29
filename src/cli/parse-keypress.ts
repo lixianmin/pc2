@@ -478,8 +478,6 @@ export function parseKeypress(s: Uint8Array | string = ''): ParsedKey {
 		raw: s,
 	};
 
-	key.sequence = key.sequence || s || key.name;
-
 	if (s === '\r' || s === '\x1b\r') {
 		key.raw = undefined;
 		key.name = 'return';

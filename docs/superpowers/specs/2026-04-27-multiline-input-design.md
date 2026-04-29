@@ -75,7 +75,7 @@ This means `readMultiline` is stateless between invocations — no persistent ra
 
 ### Wide character handling
 
-Deferred. Cursor positioning uses `string.length` (JS char index). CJK/emoji characters that occupy 2 terminal columns will cause minor cursor misalignment. Acceptable for v1; document as known limitation.
+Deferred. Cursor positioning uses `string.length` (JS char index). **Update:** CJK support was later implemented using `vWidth()` function that counts codepoints > 0x7F as double-width. Emoji combining characters are not handled. The input handler uses `parse-keypress.ts` (extracted from ink) with Kitty keyboard protocol support for Shift+Enter detection.
 
 ## Changes to `src/cli/chat.ts`
 

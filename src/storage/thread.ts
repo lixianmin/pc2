@@ -37,7 +37,7 @@ export async function updateMeta(threadDir: string, patch: Partial<ThreadMeta>):
   await writeMeta(threadDir, merged);
 }
 
-export async function listThreads(dataDir: string, limit: number = 10): Promise<ThreadMeta[]> {
+export async function listThreads(dataDir: string, limit: number = 10): Promise<ThreadMeta[]> { // 10: reasonable default for a single page of recent threads
   const threadsDir = join(dataDir, 'threads');
   let entries: string[];
   try {

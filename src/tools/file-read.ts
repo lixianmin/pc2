@@ -36,7 +36,7 @@ export function createFileReadTool(): Tool {
         }
         const fd = await open(filePath, 'r');
         try {
-          const buf = Buffer.alloc(8192);
+          const buf = Buffer.alloc(8192); // 8KB is enough to detect binary null bytes without reading large files
           await fd.read(buf, 0, 8192, 0);
           if (buf.includes(0)) {
             return { data: `Binary file, cannot read: ${filePath}`, nextPrompt: null, shouldExit: false };

@@ -27,7 +27,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
     function vWidth(str: string): number {
       let w = 0;
       for (const ch of str) {
-        w += ch.codePointAt(0)! > 0x7f ? 2 : 1;
+        w += ch.codePointAt(0)! > 0x7f ? 2 : 1; // CJK and other wide chars are double-width (codepoint > 0x7F)
       }
       return w;
     }
@@ -126,6 +126,21 @@ export function readMultiline(prompt: string): Promise<string | null> {
     function onKeypress(key: ParsedKey): void {
       if (resolved) return;
 
+      // DEBUG: log every keypress to stderr for terminal debugging
+      if (process.env.DEBUG_KEYS) {
+        process.stderr.write(`[key] name=${JSON.stringify(key.name)} shift=${key.shift} ctrl=${key.ctrl} meta=${key.meta} seq=${JSON.stringify(key.sequence)}\n`);
+      }
+
+      // Normalize Shift+Enter variants that parseKeypress doesn't map to name='return'+shift.
+      // Ghostty CSI 27;2;13~ → name:''  |  CSI 13;2~ → name:'f3' shift:true
+      if (
+        (key.name === '' && /^\x1b\[\d+(?:;\d+)*;13~$/.test(key.sequence)) ||
+        (key.name === '' && /^\x1b\[27;\d+;13~$/.test(key.sequence)) ||
+        (key.name === 'f3' && key.shift && key.sequence === '\x1b[13;2~')
+      ) {
+        key = { ...key, name: 'return', shift: true };
+      }
+
       if (key.ctrl && key.name === 'c') {
         cleanup(false);
         resolve(null);
@@ -179,14 +194,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
         return;
       }
 
-      if (key.name === 'enter') {
-        buffer = buffer.slice(0, cursorPos) + '\n' + buffer.slice(cursorPos);
-        cursorPos += 1;
-        render();
-        return;
-      }
-
-      if (key.name === 'return') {
+      if (key.name === 'enter' || key.name === 'return') {
         if (key.shift || key.meta) {
           buffer = buffer.slice(0, cursorPos) + '\n' + buffer.slice(cursorPos);
           cursorPos += 1;
@@ -267,7 +275,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
       }
 
       if (key.name === 'tab') {
-        buffer = buffer.slice(0, cursorPos) + '  ' + buffer.slice(cursorPos);
+        buffer = buffer.slice(0, cursorPos) + '  ' + buffer.slice(cursorPos); // 2 spaces per tab
         cursorPos += 2;
         render();
         return;
@@ -277,7 +285,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
         key.text ??
         (key.isPrintable
           ? key.sequence
-          : !key.ctrl && !key.meta && key.sequence.length === 1 && key.name.length === 1
+          : !key.ctrl && !key.meta && key.sequence.length === 1 && key.name !== 'return' && key.name !== 'enter' && key.name !== 'tab' && key.name !== 'escape' && key.name !== 'backspace'
             ? key.sequence
             : '');
       if (text && text.length > 0 && !key.ctrl && !key.meta) {
@@ -294,35 +302,38 @@ export function readMultiline(prompt: string): Promise<string | null> {
     function processBuffer(): void {
       parseTimer = null;
       while (dataBuffer.length > 0) {
-        const key = parseKeypress(dataBuffer);
-        if (key.name || key.sequence) {
-          const consumed = key.sequence.length || 1;
-          dataBuffer = dataBuffer.slice(consumed);
-          onKeypress(key);
+        if (dataBuffer[0] === '\x1b') {
+          const key = parseKeypress(dataBuffer);
+          if (key.name || key.sequence) {
+            const consumed = key.sequence.length || 1;
+            dataBuffer = dataBuffer.slice(consumed);
+            onKeypress(key);
+          } else {
+            dataBuffer = dataBuffer.slice(1);
+          }
         } else {
+          const ch = dataBuffer[0];
           dataBuffer = dataBuffer.slice(1);
+          onKeypress(parseKeypress(ch));
         }
       }
     }
 
     function tryProcessEsc(): void {
-      if (dataBuffer.length === 0) return;
-      if (!dataBuffer.startsWith('\x1b')) {
+      while (dataBuffer.length > 0 && dataBuffer.startsWith('\x1b')) {
+        const key = parseKeypress(dataBuffer);
+        if (key.name && key.sequence === dataBuffer) {
+          dataBuffer = dataBuffer.slice(key.sequence.length);
+          onKeypress(key);
+          continue;
+        }
+        // Bare ESC or incomplete sequence — wait 10ms for more data
+        parseTimer = setTimeout(processBuffer, 10); // 10ms: standard ESC sequence wait timeout
+        return;
+      }
+      if (dataBuffer.length > 0) {
         processBuffer();
-        return;
       }
-
-      const key = parseKeypress(dataBuffer);
-      // If parseKeypress consumed the whole buffer and gave us a name, it's complete
-      if (key.name && key.sequence === dataBuffer) {
-        dataBuffer = dataBuffer.slice(key.sequence.length);
-        onKeypress(key);
-        tryProcessEsc();
-        return;
-      }
-
-      // Bare ESC or incomplete sequence — wait for more data
-      parseTimer = setTimeout(processBuffer, 10);
     }
 
     function onData(chunk: Buffer): void {

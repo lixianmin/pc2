@@ -53,7 +53,7 @@ export class AgentLoop {
     contextBlock: string,
     relevantMemory: string,
   ): AsyncGenerator<AgentEvent, ChatResponse | null> {
-    for (let attempt = 0; attempt < 3; attempt++) {
+    for (let attempt = 0; attempt < 3; attempt++) { // retry up to 3 times to handle transient LLM API failures
       try {
         logo.info('LLM request', { turn, attempt, messages });
         const resp = await b.AgentChat(toolsDesc, messages, skillsList, sopsList, contextBlock, relevantMemory);
@@ -64,7 +64,7 @@ export class AgentLoop {
           logo.warn('BamlValidationError, silent retry', { turn, attempt });
           continue;
         }
-        if (attempt < 1) {
+        if (attempt < 3) { // always retry on non-parse errors until the loop limit above is reached
           yield { type: 'warning', content: 'LLM call failed, retrying...' };
           logo.warn('LLM call failed, retrying', { turn });
           continue;
@@ -116,7 +116,7 @@ export class AgentLoop {
 
     const toolCtx = {
       turn, index: 0,
-      lmdClient: options.lmdClient ?? null as any,
+      lmdClient: options.lmdClient ?? null,
       dataDir: options.dataDir ?? 'data',
       agentId: options.agentId ?? 'main',
       isSubAgent,
@@ -183,12 +183,6 @@ export class AgentLoop {
       messages += `[System]\n${warning}\n\n`;
     }
 
-    if (consecutiveFailures >= 3) {
-      const antiLoopMsg = `[Anti-Loop] ${lastFailedTool} failed ${consecutiveFailures} times in a row. Use ask_user to ask for guidance or change strategy entirely.`;
-      yield { type: 'warning', content: antiLoopMsg };
-      messages += `[System] ${lastFailedTool} has failed ${consecutiveFailures} times. You must change approach NOW. Use a different tool or ask_user.\n\n`;
-    }
-
     if (threadDir) {
       await checkAndFreeze(threadDir, countMessagesTokens);
       await checkAndSummarize(threadDir, async (text) => {
@@ -202,10 +196,10 @@ export class AgentLoop {
     }
 
     const msgTokens = await countTokens(messages);
-    const budget = Math.floor(config.modelContextWindow * 0.6);
+    const budget = Math.floor(config.modelContextWindow * 0.6); // use 60% of context window for conversation, leaving room for system prompt + tools
     if (msgTokens > budget) {
       const lines = messages.split('\n');
-      const keepCount = Math.max(20, Math.floor(lines.length * 0.3));
+      const keepCount = Math.max(20, Math.floor(lines.length * 0.3)); // keep at least 20 lines or 30% of conversation — preserves recent context
       messages = '[...earlier context truncated...]\n\n' + lines.slice(-keepCount).join('\n');
       logo.warn('Context truncated', { removed: lines.length - keepCount, kept: keepCount, tokens: msgTokens });
       yield { type: 'warning', content: `Context truncated: removed ${lines.length - keepCount} lines to stay within token budget` };
@@ -218,14 +212,13 @@ export class AgentLoop {
     userMessage: string,
     options: LoopOptions = {},
   ): AsyncGenerator<AgentEvent> {
-    const maxRounds = options.maxRounds ?? 30;
+    const maxRounds = options.maxRounds ?? 30; // 30 rounds: generous enough for multi-step tasks while preventing infinite loops
     const isSubAgent = options.isSubAgent ?? false;
     const toolsDesc = this.registry.getToolsDescription();
     const skillsList = formatSkillList(options.skills ?? []);
     const sopsList = formatSkillList(options.sops ?? []);
     const startTime = Date.now();
-    // 10 min for sub-agents, 20 min for main agent
-    const timeoutMs = isSubAgent ? 10 * 60 * 1000 : 20 * 60 * 1000;
+    const timeoutMs = isSubAgent ? config.subAgentTimeoutMs : config.agentTimeoutMs;
     logo.info('Agent loop started', { agentId: options.agentId ?? 'main', isSubAgent, maxRounds });
 
     let messages = this.conversationHistory + `[User]\n${userMessage}\n\n`;

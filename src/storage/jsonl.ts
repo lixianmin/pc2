@@ -43,7 +43,7 @@ export async function appendMessage(
   content: string,
   opts?: { toolCalls?: ToolCall[]; toolCallId?: string },
 ): Promise<void> {
-  const id = `msg_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`;
+  const id = `msg_${Date.now().toString(36)}_${randomBytes(3).toString('hex')}`; // 3 random bytes (6 hex chars) prevents ID collisions within same millisecond
   await appendJsonl(join(dir, 'messages-current.jsonl'), {
     id, role, content,
     timestamp: new Date().toISOString(),
