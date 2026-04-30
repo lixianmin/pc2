@@ -11,8 +11,8 @@ export function serializeMessages(messages: Message[]): string {
   for (const msg of messages) {
     if (msg.toolCalls && msg.toolCalls.length > 0) {
       for (let i = 0; i < msg.toolCalls.length; i++) {
-        const key = msg.toolCalls.length === 1 ? msg.id : `${msg.id}:${i}`;
-        toolNameMap.set(key, msg.toolCalls[i].name);
+        const tcId = msg.toolCalls[i].id ?? (msg.toolCalls.length === 1 ? msg.id : `${msg.id}:${i}`);
+        toolNameMap.set(tcId, msg.toolCalls[i].name);
       }
     }
   }
@@ -45,5 +45,5 @@ export function serializeMessages(messages: Message[]): string {
     }
   }
 
-  return lines.join('\n');
+  return lines.join('\n\n');
 }

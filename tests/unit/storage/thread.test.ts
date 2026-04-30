@@ -166,5 +166,23 @@ describe('thread', () => {
       expect(result).toContain('frozen msg');
       expect(result).toContain('current msg');
     });
+
+    it('uses summary for summarized files, loads bridge + later files', async () => {
+      const dir = makeTmp('ls2');
+      mkdirSync(join(dir, 'summaries'), { recursive: true });
+
+      await appendJsonl(join(dir, 'messages-001.jsonl'), makeMsg('1', 'oldest-content'));
+      await appendJsonl(join(dir, 'messages-002.jsonl'), makeMsg('2', 'bridge-content'));
+      await appendJsonl(join(dir, 'messages-003.jsonl'), makeMsg('3', 'last-frozen'));
+      await appendJsonl(join(dir, 'messages-current.jsonl'), makeMsg('4', 'current-content'));
+
+      writeFileSync(join(dir, 'summaries', '001.md'), 'summary-of-001');
+
+      const result = await loadThreadHistory(dir);
+      expect(result).toContain('summary-of-001');
+      expect(result).toContain('bridge-content');
+      expect(result).toContain('last-frozen');
+      expect(result).toContain('current-content');
+    });
   });
 });

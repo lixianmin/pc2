@@ -11,7 +11,7 @@ const READ_ONLY_COMMANDS = [
   'pwd', 'which', 'env', 'printenv', 'node -e', 'npx tsc --noEmit',
 ];
 
-const SHELL_METACHARACTERS = /[;&|`$()><!#~]/;
+const SHELL_METACHARACTERS = /[;&\n\r|`$()><!#~{}]/;
 
 export function isReadOnlyCommand(cmd: string): boolean {
   const trimmed = cmd.trim();
@@ -38,7 +38,7 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
     async execute(args): Promise<StepOutcome> {
       const cmd = args.command as string;
       if (!opts.autoApprove && !isReadOnlyCommand(cmd)) {
-        return { data: `Command requires approval: ${cmd}. Set autoApprove or use a read-only alternative.`, nextPrompt: null, shouldExit: false };
+        return { data: `Command requires approval: ${cmd}. Set autoApprove or use a read-only alternative.`, nextPrompt: null, shouldExit: false, isError: true };
       }
       try {
         const { stdout, stderr } = await execAsync(cmd, {

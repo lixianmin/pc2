@@ -1,8 +1,7 @@
-import { readFile, writeFile, readdir } from 'fs/promises';
+import { readFile, readdir } from 'fs/promises';
 import { join } from 'path';
-import { readJsonl } from './jsonl.js';
-import { getFrozenFiles, getCurrentFile } from './history.js';
-import { serializeMessages } from '../agent/prompt.js';
+import { assembleContext } from './context.js';
+import { writeJsonAtomic } from './json-safe.js';
 import type { Message } from '../types.js';
 
 export interface ThreadMeta {
@@ -14,8 +13,7 @@ export interface ThreadMeta {
 }
 
 export async function writeMeta(threadDir: string, meta: ThreadMeta): Promise<void> {
-  const filePath = join(threadDir, 'meta.json');
-  await writeFile(filePath, JSON.stringify(meta, null, 2), 'utf-8');
+  await writeJsonAtomic(join(threadDir, 'meta.json'), meta);
 }
 
 export async function readMeta(threadDir: string): Promise<ThreadMeta | null> {
@@ -60,17 +58,5 @@ export async function listThreads(dataDir: string, limit: number = 10): Promise<
 }
 
 export async function loadThreadHistory(threadDir: string): Promise<string> {
-  const frozenFiles = await getFrozenFiles(threadDir);
-  const currentFile = getCurrentFile(threadDir);
-
-  const allMessages: Message[] = [];
-  for (const f of frozenFiles) {
-    const msgs = await readJsonl<Message>(f);
-    allMessages.push(...msgs);
-  }
-  const currentMsgs = await readJsonl<Message>(currentFile);
-  allMessages.push(...currentMsgs);
-
-  if (allMessages.length === 0) return '';
-  return serializeMessages(allMessages);
+  return assembleContext(threadDir);
 }

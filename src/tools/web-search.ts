@@ -18,7 +18,7 @@ export function createWebSearchTool(): Tool {
         const url = `${config.webSearchUrl}/search?q=${encodeURIComponent(args.query as string)}&format=json`;
         const resp = await fetch(url);
         if (!resp.ok) {
-          return { data: `Search error: HTTP ${resp.status}`, nextPrompt: null, shouldExit: false };
+          return { data: `Search error: HTTP ${resp.status}`, nextPrompt: null, shouldExit: false, isError: true };
         }
         const data = await resp.json() as { results?: Array<{ title: string; href: string; snippet?: string; content?: string }> };
         if (!data.results || data.results.length === 0) {
@@ -32,7 +32,7 @@ export function createWebSearchTool(): Tool {
         return { data: formatted, nextPrompt: null, shouldExit: false };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { data: `Search error: ${msg}`, nextPrompt: null, shouldExit: false };
+        return { data: `Search error: ${msg}`, nextPrompt: null, shouldExit: false, isError: true };
       }
     },
   };

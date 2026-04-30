@@ -39,15 +39,22 @@ export class LmdMcpClient {
       params,
     };
     logo.debug('MCP request', { method });
-    const resp = await fetch(this.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    });
-    if (!resp.ok) throw new Error(`MCP HTTP ${resp.status}`);
-    const json = (await resp.json()) as { result?: unknown; error?: { message: string } };
-    if (json.error) throw new Error(`MCP error: ${json.error.message}`);
-    return json.result ?? null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 30_000); // 30s timeout: LMD is localhost, should respond quickly
+    try {
+      const resp = await fetch(this.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+      if (!resp.ok) throw new Error(`MCP HTTP ${resp.status}`);
+      const json = (await resp.json()) as { result?: unknown; error?: { message: string } };
+      if (json.error) throw new Error(`MCP error: ${json.error.message}`);
+      return json.result ?? null;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async queryMemory(params: { query: string; limit?: number }): Promise<MemoryHit[]> {

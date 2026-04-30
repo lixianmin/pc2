@@ -220,7 +220,7 @@ describe('readMultiline', () => {
     expect(result).toBe('a');
   });
 
-  it('Tab inserts 2 spaces', async () => {
+  it('Tab inserts 2 spaces when not a slash command', async () => {
     const stdin = mockStdin();
     const { ee: stdout } = mockStdout();
     setStdin(stdin);
@@ -235,6 +235,83 @@ describe('readMultiline', () => {
 
     const result = await promise;
     expect(result).toBe('  ');
+  });
+
+  it('Tab completes slash command with unique match', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    for (const ch of '/ses') emitKey(stdin, key(ch));
+    emitKey(stdin, key('tab'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('/sessions');
+  });
+
+  it('Tab completes slash command with /r prefix matching /resume', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    for (const ch of '/r') emitKey(stdin, key(ch));
+    emitKey(stdin, key('tab'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('/resume');
+  });
+
+  it('Tab shows candidates when multiple matches', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout, written } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ', { slashCommands: ['/sessions', '/resume', '/save'] });
+
+    await tick();
+    emitKey(stdin, key('/'));
+    emitKey(stdin, key('s'));
+    emitKey(stdin, key('tab'));
+    await tick();
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('/s');
+    const allOutput = written.join('');
+    expect(allOutput).toContain('/sessions');
+    expect(allOutput).toContain('/save');
+  });
+
+  it('Tab does not complete when no match', async () => {
+    const stdin = mockStdin();
+    const { ee: stdout } = mockStdout();
+    setStdin(stdin);
+    setStdout(stdout);
+
+    const { readMultiline } = await import('../../../src/cli/input.js');
+    const promise = readMultiline('> ');
+
+    await tick();
+    for (const ch of '/xyz') emitKey(stdin, key(ch));
+    emitKey(stdin, key('tab'));
+    emitKey(stdin, key('return'));
+
+    const result = await promise;
+    expect(result).toBe('/xyz');
   });
 
   it('Ctrl+A moves cursor to start, then typing prepends', async () => {

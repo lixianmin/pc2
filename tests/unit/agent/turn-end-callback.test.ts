@@ -50,10 +50,20 @@ describe('turnEndCallback', () => {
     expect(result).toContain('60');
   });
 
-  it('returns DANGER at turn 61', () => {
-    const result = turnEndCallback(61, baseCtx);
+  it('returns DANGER at threshold turn', () => {
+    const result = turnEndCallback(60, baseCtx);
     expect(result).toContain('DANGER');
-    expect(result).toContain('61');
+    expect(result).toContain('60');
+  });
+
+  it('returns DANGER at periodic interval after threshold', () => {
+    const result = turnEndCallback(65, baseCtx);
+    expect(result).toContain('DANGER');
+  });
+
+  it('does not return DANGER between periodic intervals', () => {
+    const result = turnEndCallback(61, baseCtx);
+    expect(result).toBeNull();
   });
 
   it('returns plan reminder at turn 10 with plan file', () => {

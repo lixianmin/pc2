@@ -5,7 +5,21 @@ import {
   type ParsedKey,
 } from './parse-keypress.js';
 
-export function readMultiline(prompt: string): Promise<string | null> {
+function commonPrefix(strings: string[]): string {
+  if (strings.length === 0) return '';
+  let prefix = strings[0];
+  for (let i = 1; i < strings.length; i++) {
+    while (!strings[i].startsWith(prefix)) {
+      prefix = prefix.slice(0, -1);
+      if (prefix.length === 0) return '';
+    }
+  }
+  return prefix;
+}
+
+const DEFAULT_SLASH_COMMANDS = ['/sessions', '/resume'];
+
+export function readMultiline(prompt: string, options?: { slashCommands?: string[] }): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
     const stdin = process.stdin;
     const stdout = process.stdout;
@@ -14,6 +28,9 @@ export function readMultiline(prompt: string): Promise<string | null> {
       resolve(null);
       return;
     }
+
+    const slashCommands = options?.slashCommands ?? DEFAULT_SLASH_COMMANDS;
+    let lastCandidates: string[] = [];
 
     let buffer = '';
     let cursorPos = 0;
@@ -211,6 +228,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
         if (cursorPos > 0) {
           buffer = buffer.slice(0, cursorPos - 1) + buffer.slice(cursorPos);
           cursorPos -= 1;
+          lastCandidates = [];
         }
         render();
         return;
@@ -219,6 +237,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
       if (key.name === 'delete') {
         if (cursorPos < buffer.length) {
           buffer = buffer.slice(0, cursorPos) + buffer.slice(cursorPos + 1);
+          lastCandidates = [];
         }
         render();
         return;
@@ -275,8 +294,37 @@ export function readMultiline(prompt: string): Promise<string | null> {
       }
 
       if (key.name === 'tab') {
+        const lineStart = buffer.lastIndexOf('\n', cursorPos - 1) + 1;
+        const line = buffer.slice(lineStart, cursorPos);
+        if (line.startsWith('/')) {
+          const prefix = line;
+          const matches = slashCommands.filter((c) => c.startsWith(prefix));
+          if (matches.length === 1) {
+            const completion = matches[0].slice(prefix.length);
+            buffer = buffer.slice(0, cursorPos) + completion + buffer.slice(cursorPos);
+            cursorPos += completion.length;
+            lastCandidates = [];
+          } else if (matches.length > 1) {
+            const common = commonPrefix(matches);
+            if (common.length > prefix.length) {
+              const completion = common.slice(prefix.length);
+              buffer = buffer.slice(0, cursorPos) + completion + buffer.slice(cursorPos);
+              cursorPos += completion.length;
+            }
+            if (matches !== lastCandidates) {
+              stdout.write('\n' + matches.join('  ') + '\n');
+              previousVisualLines = 0;
+            }
+            lastCandidates = matches;
+          } else {
+            lastCandidates = [];
+          }
+          render();
+          return;
+        }
         buffer = buffer.slice(0, cursorPos) + '  ' + buffer.slice(cursorPos); // 2 spaces per tab
         cursorPos += 2;
+        lastCandidates = [];
         render();
         return;
       }
@@ -291,6 +339,7 @@ export function readMultiline(prompt: string): Promise<string | null> {
       if (text && text.length > 0 && !key.ctrl && !key.meta) {
         buffer = buffer.slice(0, cursorPos) + text + buffer.slice(cursorPos);
         cursorPos += text.length;
+        lastCandidates = [];
         render();
         return;
       }

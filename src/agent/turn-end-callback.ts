@@ -43,12 +43,11 @@ export function turnEndCallback(turn: number, ctx: CallbackContext): string | nu
   }
 
   // Priority 4: hard danger limit
-  if (turn >= config.dangerTurnThreshold) {
+  if (turn >= config.dangerTurnThreshold && (turn === config.dangerTurnThreshold || turn % 5 === 0)) {
     return `[DANGER] Turn ${turn} — extremely long execution. Use ask_user to report progress and confirm continuation.`;
   }
 
-  // Priority 5: generic safety — catch-all for high turn counts
-  if (turn > config.forceAskUserTurn) {
+  if (turn > config.forceAskUserTurn && (turn === config.forceAskUserTurn + 1 || turn % 5 === 0)) {
     return `[Safety] Turn ${turn} exceeds safe limit. Use ask_user to report progress and ask if you should continue.`;
   }
 

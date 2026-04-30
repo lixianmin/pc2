@@ -1,4 +1,7 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 import { AgentLoop } from '../../../src/agent/loop.js';
 import { ToolRegistry } from '../../../src/tools/registry.js';
 import type { Tool } from '../../../src/tools/types.js';
@@ -19,9 +22,24 @@ vi.mock('../../../src/storage/tokens.js', async () => {
 });
 
 describe('AgentLoop', () => {
+  let tempDirs: string[] = [];
+
   beforeEach(() => {
     vi.clearAllMocks();
+    tempDirs = [];
   });
+
+  afterEach(() => {
+    for (const d of tempDirs) {
+      rmSync(d, { recursive: true, force: true });
+    }
+  });
+
+  function makeThreadDir(): string {
+    const dir = mkdtempSync(join(tmpdir(), 'pc2-loop-'));
+    tempDirs.push(dir);
+    return dir;
+  }
 
   it('exits on text-only response (no tool calls)', async () => {
     const { b } = await import('../../../baml_client/index.js');
@@ -32,8 +50,9 @@ describe('AgentLoop', () => {
 
     const registry = new ToolRegistry();
     const loop = new AgentLoop(registry);
+    const threadDir = makeThreadDir();
     const events = [];
-    for await (const event of loop.execute('Hi', { maxRounds: 5 })) {
+    for await (const event of loop.execute('Hi', { maxRounds: 5, threadDir })) {
       events.push(event);
     }
     const textEvents = events.filter((e) => e.type === 'text');
@@ -57,8 +76,9 @@ describe('AgentLoop', () => {
     const registry = new ToolRegistry();
     registry.register(echoTool);
     const loop = new AgentLoop(registry);
+    const threadDir = makeThreadDir();
     const events = [];
-    for await (const event of loop.execute('test', { maxRounds: 5 })) {
+    for await (const event of loop.execute('test', { maxRounds: 5, threadDir })) {
       events.push(event);
     }
     expect(events.some((e) => e.type === 'tool_result')).toBe(true);
@@ -82,16 +102,16 @@ describe('AgentLoop', () => {
     const registry = new ToolRegistry();
     registry.register(echoTool);
     const loop = new AgentLoop(registry);
+    const threadDir = makeThreadDir();
     const events = [];
-    for await (const event of loop.execute('test', { maxRounds: 2 })) {
+    for await (const event of loop.execute('test', { maxRounds: 2, threadDir })) {
       events.push(event);
     }
     expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'max_rounds' });
   });
 
-  it('truncates messages when approaching context limit', async () => {
+  it('no truncation warning with disk-based context', async () => {
     const { b } = await import('../../../baml_client/index.js');
-    const { countTokens } = await import('../../../src/storage/tokens.js');
 
     let callCount = 0;
     (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async () => {
@@ -101,8 +121,6 @@ describe('AgentLoop', () => {
       }
       return { text: 'Done', tool_calls: [] };
     });
-
-    (countTokens as ReturnType<typeof vi.fn>).mockResolvedValue(70000);
 
     const echoTool: Tool = {
       name: 'echo',
@@ -114,31 +132,15 @@ describe('AgentLoop', () => {
     const registry = new ToolRegistry();
     registry.register(echoTool);
     const loop = new AgentLoop(registry);
+    const threadDir = makeThreadDir();
+
     const events = [];
-    for await (const event of loop.execute('test', { maxRounds: 5 })) {
+    for await (const event of loop.execute('test', { maxRounds: 5, threadDir })) {
       events.push(event);
     }
-    expect(events.some(e => e.type === 'warning' && String(e.content).includes('truncated'))).toBe(true);
+    const truncWarnings = events.filter(e => e.type === 'warning' && String(e.content).includes('truncated'));
+    expect(truncWarnings).toHaveLength(0);
     expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'completed' });
-  });
-
-  it('resumeHistory injects prior history into prompt', async () => {
-    const { b } = await import('../../../baml_client/index.js');
-    let capturedHistory = '';
-    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (_tools: string, history: string) => {
-      capturedHistory = history;
-      return { text: 'Done', tool_calls: [] };
-    });
-
-    const registry = new ToolRegistry();
-    const loop = new AgentLoop(registry);
-    loop.resumeHistory('[User]\nprevious question\n\n[Assistant]\nprevious answer\n\n');
-
-    for await (const _ of loop.execute('new question')) { /* consume */ }
-
-    expect(capturedHistory).toContain('previous question');
-    expect(capturedHistory).toContain('previous answer');
-    expect(capturedHistory).toContain('[User]\nnew question');
   });
 
   it('persists user messages to JSONL when threadDir is set', async () => {
@@ -150,34 +152,13 @@ describe('AgentLoop', () => {
 
     const registry = new ToolRegistry();
     const loop = new AgentLoop(registry);
-    const tmpDir = `/tmp/loop-test-${Date.now()}`;
-    const { mkdirSync, readFileSync, rmSync } = await import('fs');
-    mkdirSync(tmpDir, { recursive: true });
+    const threadDir = makeThreadDir();
 
-    for await (const _ of loop.execute('test user message', { threadDir: tmpDir })) { /* consume */ }
+    for await (const _ of loop.execute('test user message', { threadDir })) { /* consume */ }
 
-    const content = readFileSync(`${tmpDir}/messages-current.jsonl`, 'utf-8');
+    const { readFileSync } = await import('fs');
+    const content = readFileSync(`${threadDir}/messages-current.jsonl`, 'utf-8');
     expect(content).toContain('"role":"user"');
     expect(content).toContain('test user message');
-    rmSync(tmpDir, { recursive: true });
-  });
-
-  it('carries conversation history across execute() calls', async () => {
-    const { b } = await import('../../../baml_client/index.js');
-    let historyCapture: string[] = [];
-    (b.AgentChat as ReturnType<typeof vi.fn>).mockImplementation(async (_tools: string, history: string) => {
-      historyCapture.push(history);
-      return { text: 'Done', tool_calls: [] };
-    });
-
-    const registry = new ToolRegistry();
-    const loop = new AgentLoop(registry);
-
-    for await (const _ of loop.execute('first question')) { /* consume */ }
-    for await (const _ of loop.execute('second question')) { /* consume */ }
-
-    expect(historyCapture[0]).toContain('[User]\nfirst question');
-    expect(historyCapture[1]).toContain('[User]\nfirst question');
-    expect(historyCapture[1]).toContain('[User]\nsecond question');
   });
 });

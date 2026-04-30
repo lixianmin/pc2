@@ -13,7 +13,7 @@ import { createMemorySearchTool } from '../tools/memory-search.js';
 import { createAskUserTool } from '../tools/ask-user.js';
 import { createSpawnAgentTool } from '../tools/spawn-agent.js';
 import { config } from '../config.js';
-import { writeMeta, updateMeta, listThreads, loadThreadHistory, readMeta } from '../storage/thread.js';
+import { writeMeta, updateMeta, listThreads, readMeta } from '../storage/thread.js';
 import { LmdMcpClient } from '../memory/lmd-client.js';
 import { scanSkillDirectory } from '../skill-sop/loader.js';
 import { readMultiline } from './input.js';
@@ -30,11 +30,17 @@ export function makeThreadDir(): string {
       if (!isNaN(n) && String(n) === entry && n > maxNum) maxNum = n;
     }
   } catch {}
-  const nextNum = maxNum + 1;
-  const name = String(nextNum);
-  const dir = join(threadsDir, name);
-  mkdirSync(join(dir, 'summaries'), { recursive: true });
-  return dir;
+  let attempt = maxNum + 1;
+  while (true) {
+    const dir = join(threadsDir, String(attempt));
+    try {
+      mkdirSync(join(dir, 'summaries'), { recursive: true });
+      return dir;
+    } catch (e: any) {
+      if (e.code === 'EEXIST') { attempt++; continue; }
+      throw e;
+    }
+  }
 }
 
 export async function startChat(options: { initialTask?: string }): Promise<void> {
@@ -99,8 +105,6 @@ export async function startChat(options: { initialTask?: string }): Promise<void
       const idx = parseInt(answer, 10);
       const thread = threads[idx];
       const resumedDir = join(config.dataDir, 'threads', thread.id);
-      const history = await loadThreadHistory(resumedDir);
-      loop.resumeHistory(history);
       activeThreadDir = resumedDir;
       console.log(`Resumed session: ${thread.preview}\n`);
     }
@@ -120,21 +124,24 @@ export async function startChat(options: { initialTask?: string }): Promise<void
     }
     const thread = threads[idx];
     const resumedDir = join(config.dataDir, 'threads', thread.id);
-    const history = await loadThreadHistory(resumedDir);
-    loop.resumeHistory(history);
     activeThreadDir = resumedDir;
     console.log(`Resumed session: ${thread.preview}\n`);
+  };
+
+  const shutdown = (): never => {
+    logo.close();
+    process.exit(0);
   };
 
   const prompt = async () => {
     while (true) {
       const input = await readMultiline('\n> ');
       if (input === null) {
-        logo.close();
-        process.exit(0);
+        shutdown();
+        return;
       }
       if (!input.trim()) continue;
-      if (input === 'exit' || input === 'quit') { logo.close(); process.exit(0); }
+      if (input === 'exit' || input === 'quit') { shutdown(); }
       if (input === '/sessions') { await handleSessions(); continue; }
       if (input.startsWith('/resume')) { await handleResume(input); continue; }
 

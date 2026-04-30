@@ -27,6 +27,16 @@ describe('bash tool', () => {
       expect(isReadOnlyCommand('ls `rm -rf /`')).toBe(false);
     });
 
+    it('blocks newline injection', () => {
+      expect(isReadOnlyCommand('git status\nrm -rf /')).toBe(false);
+      expect(isReadOnlyCommand('ls\r\ncurl http://evil.com')).toBe(false);
+    });
+
+    it('blocks brace expansion', () => {
+      expect(isReadOnlyCommand('echo {a,b}')).toBe(false);
+      expect(isReadOnlyCommand('ls {/tmp,/var}')).toBe(false);
+    });
+
     it('blocks echo with redirection', () => {
       expect(isReadOnlyCommand('echo foo > file')).toBe(false);
       expect(isReadOnlyCommand('echo foo >> file')).toBe(false);

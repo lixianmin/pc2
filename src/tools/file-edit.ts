@@ -19,13 +19,13 @@ export function createFileEditTool(): Tool {
     async execute(args, ctx): Promise<StepOutcome> {
       const filePath = args.path as string;
       if (!isPathWithinRoot(filePath, ctx.workspaceRoot)) {
-        return { data: `Access denied: path outside workspace (${filePath})`, nextPrompt: null, shouldExit: false };
+        return { data: `Access denied: path outside workspace (${filePath})`, nextPrompt: null, shouldExit: false, isError: true };
       }
       const oldStr = args.old_string as string;
       const newStr = args.new_string as string;
       const content = await readFile(filePath, 'utf-8');
       if (!content.includes(oldStr)) {
-        return { data: `old_string not found in ${filePath}`, nextPrompt: null, shouldExit: false };
+        return { data: `old_string not found in ${filePath}`, nextPrompt: null, shouldExit: false, isError: true };
       }
       const updated = content.replace(oldStr, newStr);
       await writeFile(filePath, updated, 'utf-8');

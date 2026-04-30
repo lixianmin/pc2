@@ -37,9 +37,9 @@ export async function runDream(
       if (abortSignal?.aborted) break;
 
       try {
-        const match = summaryPath.match(/\/(\d+)\.md$/);
-        if (!match) continue;
-        const num = match[1];
+        const base = summaryPath.split('/').pop() ?? '';
+        const num = base.replace(/\.md$/, '');
+        if (!num) continue;
 
         const jsonlPath = join(threadDir, `messages-${num}.jsonl`);
         const messages = await readJsonl<Message>(jsonlPath);
@@ -58,8 +58,9 @@ export async function runDream(
         await rename(summaryPath, newPath);
 
         result.processed++;
-      } catch {
+      } catch (err) {
         result.errors++;
+        logo.error('Dream failed to process summary', { summaryPath, err: String(err) });
       }
     }
   }

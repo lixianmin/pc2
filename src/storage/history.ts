@@ -18,6 +18,12 @@ export async function getFrozenFiles(threadDir: string): Promise<string[]> {
     .map((f) => join(threadDir, f));
 }
 
+export async function getBridgeFile(threadDir: string): Promise<string | null> {
+  const frozen = await getFrozenFiles(threadDir);
+  if (frozen.length < 2) return null;
+  return frozen[frozen.length - 2];
+}
+
 export async function loadFrozenMessages(filePath: string): Promise<Message[]> {
   return readJsonl<Message>(filePath);
 }

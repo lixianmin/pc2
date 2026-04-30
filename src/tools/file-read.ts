@@ -19,7 +19,7 @@ export function createFileReadTool(): Tool {
     async execute(args, ctx): Promise<StepOutcome> {
       const filePath = args.path as string;
       if (!isPathWithinRoot(filePath, ctx.workspaceRoot)) {
-        return { data: `Access denied: path outside workspace (${filePath})`, nextPrompt: null, shouldExit: false };
+        return { data: `Access denied: path outside workspace (${filePath})`, nextPrompt: null, shouldExit: false, isError: true };
       }
       try {
         const content = await readFile(filePath, 'utf-8');
@@ -32,16 +32,16 @@ export function createFileReadTool(): Tool {
       } catch (err: unknown) {
         const e = err as { code?: string; message?: string };
         if (e.code === 'ENOENT') {
-          return { data: `File not found: ${filePath}`, nextPrompt: null, shouldExit: false };
+          return { data: `File not found: ${filePath}`, nextPrompt: null, shouldExit: false, isError: true };
         }
         const fd = await open(filePath, 'r');
         try {
           const buf = Buffer.alloc(8192); // 8KB is enough to detect binary null bytes without reading large files
           await fd.read(buf, 0, 8192, 0);
           if (buf.includes(0)) {
-            return { data: `Binary file, cannot read: ${filePath}`, nextPrompt: null, shouldExit: false };
+            return { data: `Binary file, cannot read: ${filePath}`, nextPrompt: null, shouldExit: false, isError: true };
           }
-          return { data: `Encoding error: file is not UTF-8 (${filePath}). Use bash with iconv to convert.`, nextPrompt: null, shouldExit: false };
+          return { data: `Encoding error: file is not UTF-8 (${filePath}). Use bash with iconv to convert.`, nextPrompt: null, shouldExit: false, isError: true };
         } finally {
           await fd.close();
         }

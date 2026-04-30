@@ -9,9 +9,10 @@ const BLOCKED_HOSTS = [
 export function isUrlAllowed(urlStr: string): boolean {
   try {
     const parsed = new URL(urlStr);
-    const host = parsed.hostname;
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.replace(/^\[|\]$/g, '');
+    if (host.includes('::ffff')) return false;
     if (BLOCKED_HOSTS.includes(host)) return false;
-    // RFC 1918/RFC 6598 private IPv4 ranges: 10/8, 172.16-31/16, 192.168/16 — block to prevent SSRF
     if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(host)) return false;
     return true;
   } catch {
@@ -41,10 +42,10 @@ export function createWebFetchTool(): Tool {
     },
     async execute(args): Promise<StepOutcome> {
       if (!isUrlAllowed(args.url as string)) {
-        return { data: `URL not allowed: ${args.url}`, nextPrompt: null, shouldExit: false };
+        return { data: `URL not allowed: ${args.url}`, nextPrompt: null, shouldExit: false, isError: true };
       }
       try {
-        const resp = await fetch(args.url as string);
+        const resp = await fetch(args.url as string, { redirect: 'error' });
         const contentType = resp.headers.get('content-type') ?? '';
         const text = await resp.text();
 
@@ -60,7 +61,7 @@ export function createWebFetchTool(): Tool {
         return { data: result, nextPrompt: null, shouldExit: false };
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        return { data: `Fetch error: ${msg}`, nextPrompt: null, shouldExit: false };
+        return { data: `Fetch error: ${msg}`, nextPrompt: null, shouldExit: false, isError: true };
       }
     },
   };

@@ -15,7 +15,7 @@ export function createSpawnAgentTool(): Tool {
     },
     async execute(args, ctx): Promise<StepOutcome> {
       if (ctx.isSubAgent) {
-        return { data: 'Error: sub-agents cannot spawn further sub-agents.', nextPrompt: null, shouldExit: false };
+        return { data: 'Error: sub-agents cannot spawn further sub-agents.', nextPrompt: null, shouldExit: false, isError: true };
       }
       return {
         data: { task: args.task, context: args.context ?? '' },

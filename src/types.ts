@@ -5,6 +5,7 @@
 export interface ToolCall {
   name: string;
   arguments: Record<string, unknown>;
+  id?: string;
 }
 
 export interface Message {
@@ -22,6 +23,7 @@ export interface StepOutcome {
   data: ToolResult | null;
   nextPrompt: string | null;
   shouldExit: boolean;
+  isError?: boolean;
 }
 
 export interface MemoryHit {

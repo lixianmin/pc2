@@ -26,6 +26,16 @@ describe('regression: thread dir naming', () => {
 });
 
 describe('regression: llm_error should not exit silently', () => {
+  let tempDir: string;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'pc2-reg-'));
+  });
+
+  afterEach(() => {
+    rmSync(tempDir, { recursive: true, force: true });
+  });
+
   it('yields user-visible error message on llm_error', async () => {
     const { b } = await import('../../baml_client/index.js');
     (b.AgentChat as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API timeout'));
@@ -35,7 +45,7 @@ describe('regression: llm_error should not exit silently', () => {
     const loop = new AgentLoop(registry);
 
     const events: Array<{ type: string; [key: string]: unknown }> = [];
-    for await (const event of loop.execute('test query')) {
+    for await (const event of loop.execute('test query', { threadDir: join(tempDir, 'thread') })) {
       events.push(event);
     }
 

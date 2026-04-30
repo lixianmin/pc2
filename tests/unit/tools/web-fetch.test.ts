@@ -30,6 +30,16 @@ describe('isUrlAllowed (SSRF protection)', () => {
     expect(isUrlAllowed('http://0.0.0.0:3000/')).toBe(false);
   });
 
+  it('blocks IPv6 loopback [::1]', () => {
+    expect(isUrlAllowed('http://[::1]:8080/admin')).toBe(false);
+    expect(isUrlAllowed('http://[::1]/api')).toBe(false);
+  });
+
+  it('blocks IPv6-mapped IPv4 [::ffff:127.0.0.1]', () => {
+    expect(isUrlAllowed('http://[::ffff:127.0.0.1]/admin')).toBe(false);
+    expect(isUrlAllowed('http://[::ffff:169.254.169.254]/latest/meta-data/')).toBe(false);
+  });
+
   it('allows public HTTPS URLs', () => {
     expect(isUrlAllowed('https://example.com/page')).toBe(true);
   });

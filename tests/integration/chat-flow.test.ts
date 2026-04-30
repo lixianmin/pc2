@@ -55,7 +55,8 @@ describe('integration: chat flow', () => {
 
   async function collectEvents(loop: AgentLoop, input: string, options?: Record<string, unknown>) {
     const events: Array<{ type: string; [key: string]: unknown }> = [];
-    for await (const event of loop.execute(input, options)) {
+    const opts = { threadDir: join(tempDir, 'thread'), ...options };
+    for await (const event of loop.execute(input, opts)) {
       events.push(event);
     }
     return events;

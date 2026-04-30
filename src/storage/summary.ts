@@ -26,7 +26,6 @@ export async function checkAndFreeze(
 
     await rename(currentFile, frozenPath);
     logo.info('Freeze completed', { file: frozenPath, tokens, messages: messages.length });
-    await writeFile(currentFile, '', 'utf-8');
     return true;
   });
   freezeLocks.set(threadDir, next.catch(() => false));
@@ -38,10 +37,10 @@ export async function checkAndSummarize(
   summarizeFn?: (messages: string) => Promise<string>,
 ): Promise<string | null> {
   const frozenFiles = await getFrozenFiles(threadDir);
-  if (frozenFiles.length < 3) return null; // need at least 3 frozen files so summarization has enough material to be worthwhile
+  if (frozenFiles.length < 3) return null;
 
   const unprocessed = await getUnprocessedSummaries(threadDir);
-  if (unprocessed.length > 0) return null;
+  if (unprocessed.length >= 3) return null;
 
   if (!summarizeFn) return null;
 
@@ -50,6 +49,7 @@ export async function checkAndSummarize(
   const formatted = JSON.stringify(messages);
 
   const summary = await summarizeFn(formatted);
+  if (!summary) return null;
 
   const match = oldestFile.match(/messages-(\d+)\.jsonl$/);
   const num = match![1];
