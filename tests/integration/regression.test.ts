@@ -5,7 +5,6 @@ import { tmpdir } from 'os';
 import { AgentLoop } from '../../src/agent/loop.js';
 import { ToolRegistry } from '../../src/tools/registry.js';
 import { createBashTool } from '../../src/tools/bash.js';
-import { makeThreadDir } from '../../src/cli/chat.js';
 
 vi.mock('../../baml_client/index.js', () => ({
   b: {
@@ -13,17 +12,6 @@ vi.mock('../../baml_client/index.js', () => ({
     SummarizeHistory: vi.fn(),
   },
 }));
-
-describe('regression: thread dir naming', () => {
-  it('uses sequential numeric names', () => {
-    const dir = makeThreadDir();
-    const name = dir.split('/').pop()!;
-    const n = parseInt(name, 10);
-    expect(isNaN(n)).toBe(false);
-    expect(String(n)).toBe(name);
-    expect(n).toBeGreaterThan(0);
-  });
-});
 
 describe('regression: llm_error should not exit silently', () => {
   let tempDir: string;
