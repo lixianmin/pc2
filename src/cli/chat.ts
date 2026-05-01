@@ -16,7 +16,7 @@ import { config } from '../config.js';
 import { writeMeta, updateMeta, listThreads, readMeta } from '../storage/thread.js';
 import { LmdMcpClient } from '../memory/lmd-client.js';
 import { scanSkillDirectory } from '../skill-sop/loader.js';
-import { readMultiline } from './input.js';
+import { readMultiline, DEFAULT_SLASH_COMMANDS } from './input.js';
 import select from '@inquirer/select';
 
 export function makeThreadDir(): string {
@@ -135,7 +135,8 @@ export async function startChat(options: { initialTask?: string }): Promise<void
 
   const prompt = async () => {
     while (true) {
-      const input = await readMultiline('\n> ');
+      const skillCommands = skills.map(s => '/' + s.name);
+      const input = await readMultiline('\n> ', { slashCommands: [...DEFAULT_SLASH_COMMANDS, ...skillCommands] });
       if (input === null) {
         shutdown();
         return;
@@ -144,6 +145,36 @@ export async function startChat(options: { initialTask?: string }): Promise<void
       if (input === 'exit' || input === 'quit') { shutdown(); }
       if (input === '/sessions') { await handleSessions(); continue; }
       if (input.startsWith('/resume')) { await handleResume(input); continue; }
+
+      const matchedSkill = skills.find(s => input.startsWith('/' + s.name + ' ') || input === '/' + s.name);
+      if (matchedSkill) {
+        const args = input.slice(('/' + matchedSkill.name).length).trim();
+        const skillBody = matchedSkill.body ?? '';
+        const agentInput = `${skillBody}\n\n---\n\n用户要求: ${args || '请帮我处理文件'}`;
+        const threadDir = ensureThread(agentInput);
+        let textYielded = false;
+        for await (const event of loop.execute(agentInput, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
+          if (event.type === 'text') {
+            textYielded = true;
+            process.stdout.write(event.content);
+          } else if (event.type === 'tool_result') {
+            process.stdout.write(`\n[tool: ${event.name}] ${String(event.result).slice(0, 200)}\n`); // 200 chars: enough to see result summary
+          } else if (event.type === 'warning') {
+            process.stdout.write(`\n[warning] ${event.content}\n`);
+          } else if (event.type === 'done') {
+            if (!textYielded) {
+              logo.warn('Chat loop completed without text output', { reason: event.reason });
+            }
+            process.stdout.write('\n');
+          }
+        }
+        const meta = await readMeta(threadDir);
+        await updateMeta(threadDir, {
+          lastActivityAt: formatTimestamp(),
+          messageCount: (meta?.messageCount ?? 0) + 1,
+        });
+        continue;
+      }
 
       const threadDir = ensureThread(input);
 

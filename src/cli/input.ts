@@ -17,7 +17,7 @@ function commonPrefix(strings: string[]): string {
   return prefix;
 }
 
-const DEFAULT_SLASH_COMMANDS = ['/sessions', '/resume'];
+export const DEFAULT_SLASH_COMMANDS = ['/sessions', '/resume'];
 
 export function readMultiline(prompt: string, options?: { slashCommands?: string[] }): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
