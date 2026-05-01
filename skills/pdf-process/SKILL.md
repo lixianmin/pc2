@@ -2,7 +2,7 @@
 name: pdf-process
 description: 当用户提到 PDF 文件、要求处理 PDF、或需要从 PDF 提取内容时激活此技能
 evolvable: true
-allowed-tools: Bash(mineru*) Bash(marker_single*) Bash(mkdir*) Bash(which*)
+allowed-tools: Bash(mineru*) Bash(marker_single*) Bash(mkdir*) Bash(which*) Bash(pip*)
 ---
 
 # PDF Processing Skill
@@ -10,7 +10,11 @@ allowed-tools: Bash(mineru*) Bash(marker_single*) Bash(mkdir*) Bash(which*)
 ## 前置检查
 
 1. 运行 `which mineru` 检查 MinerU 是否已安装
-2. 如果未安装，告诉用户安装方法（见下方"安装指南"），停止
+2. 如果未安装，自动执行安装:
+   ```
+   pip install "mineru[all]"
+   ```
+   安装完成后再次运行 `which mineru` 验证。如果仍然失败，告知用户手动安装并停止。
 3. 如果用户未提供文件路径，用 ask_user 询问 PDF 路径
 
 ## 处理单个 PDF
@@ -41,24 +45,14 @@ allowed-tools: Bash(mineru*) Bash(marker_single*) Bash(mkdir*) Bash(which*)
 
 | 错误 | 处理 |
 |------|------|
-| mineru 未安装 | 输出安装指南，停止 |
+| mineru 未安装 | 自动执行 `pip install "mineru[all]"`，验证后继续 |
+| 安装后仍找不到 mineru | 告知用户手动安装并停止 |
 | 转换失败（mineru） | 尝试 marker_single fallback |
 | marker_single 也失败 | 报错，建议用户检查文件是否加密/损坏 |
 | 找不到输出 .md | 检查其他子目录，报告实际输出结构 |
 | 未提供文件路径 | 用 ask_user 询问 |
 
-## 安装指南（MinerU）
+## 安装说明
 
-MinerU 3.x 安装:
-```
-# CPU
-pip install mineru[all]
-
-# GPU (自动检测 CUDA)
-pip install mineru[all]
-
-# 验证
-mineru --help
-```
-
+MinerU 是 Python 包，首次使用时由 agent 自动安装: `pip install "mineru[all]"`
 如遇问题参考: https://github.com/opendatalab/MinerU
