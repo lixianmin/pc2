@@ -43,4 +43,16 @@ describe('skill-sop loader', () => {
     const malicious = '---\nname: Evil\ndescription: !!js/function "function(){return process}"\nevolvable: true\n---\n\nBody';
     expect(() => parseSkillFrontmatter(malicious)).toThrow();
   });
+
+  it('parses pdf-process skill', async () => {
+    const skills = await scanSkillDirectory('skills');
+    const pdfSkill = skills.find(s => s.name === 'pdf-process');
+    expect(pdfSkill).toBeDefined();
+    expect(pdfSkill!.evolvable).toBe(true);
+    expect(pdfSkill!.description).toContain('PDF');
+    expect(pdfSkill!.allowedTools).toBeDefined();
+    expect(pdfSkill!.allowedTools).toContain('Bash(mineru*)');
+    expect(pdfSkill!.body).toBeDefined();
+    expect(pdfSkill!.body).toContain('mineru');
+  });
 });
