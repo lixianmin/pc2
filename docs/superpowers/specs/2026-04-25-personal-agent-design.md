@@ -914,11 +914,11 @@ PDF processing is implemented as a **skill** (not a built-in tool). The skill us
 User provides PDF path
     |
     v
-skill: pdf_process (uses bash tool internally)
+skill: pdf-process (uses bash tool internally)
     |
     +-- Call external CLI via bash
-    |   Primary: magic-pdf -p input.pdf -o output_dir
-    |   Fallback: marker_single input.pdf output_dir
+    |   Primary: mineru -p input.pdf -o /tmp/pc2-pdf/output
+    |   Fallback: marker_single input.pdf /tmp/pc2-pdf/output
     |
     +-- Read generated Markdown via file_read
     |
