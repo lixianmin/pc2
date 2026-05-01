@@ -193,6 +193,13 @@ export class AgentLoop {
     const sopsList = formatSkillList(options.sops ?? []);
     const startTime = Date.now();
     const timeoutMs = isSubAgent ? config.subAgentTimeoutMs : config.agentTimeoutMs;
+    const mergedOptions = {
+      ...options,
+      allowedTools: [
+        ...(options.allowedTools ?? []),
+        ...(options.skills ?? []).flatMap(s => s.allowedTools ?? []),
+      ],
+    };
     logo.info('Agent loop started', { agentId: options.agentId ?? 'main', isSubAgent, maxRounds });
 
     await appendMessage(threadDir, 'user', userMessage);
@@ -242,7 +249,7 @@ export class AgentLoop {
 
       for (const tc of response.tool_calls!) {
         inMemory += `[Tool Call: ${tc.name}](${tc.arguments})\n\n`;
-        const { shouldExit, resultStr } = yield* this.executeToolCall(turn, tc, threadDir, options, isSubAgent, state);
+        const { shouldExit, resultStr } = yield* this.executeToolCall(turn, tc, threadDir, mergedOptions, isSubAgent, state);
         inMemory += `[Tool Result: ${tc.name}]\n${resultStr}\n\n`;
         if (shouldExit) {
           logo.info('Agent loop done', { reason: 'ask_user', turns: turn, elapsed_ms: Date.now() - startTime });

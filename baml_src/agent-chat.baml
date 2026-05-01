@@ -21,6 +21,8 @@ function AgentChat(
     {% if skills_list %}
     ## Skills
     {{ skills_list }}
+
+    When a skill's description matches the user's request, read the skill's SKILL.md file (path: skills/{skill-name}/SKILL.md) using file_read to get full instructions. Follow those instructions precisely.
     {% endif %}
 
     {% if sops_list %}
