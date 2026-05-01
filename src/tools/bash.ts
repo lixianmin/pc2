@@ -1,6 +1,6 @@
 import { exec } from 'child_process';
 import { promisify } from 'util';
-import type { Tool } from './types.js';
+import type { Tool, ToolContext } from './types.js';
 import type { StepOutcome } from '../types.js';
 
 const execAsync = promisify(exec);
@@ -24,6 +24,17 @@ export interface BashToolOptions {
   cwd?: string;
 }
 
+export function isAllowedBySkill(cmd: string, patterns: string[]): boolean {
+  for (const p of patterns) {
+    if (!p.startsWith('Bash(') || !p.endsWith(')')) continue;
+    let glob = p.slice(5, -1);
+    if (!glob.endsWith('*')) continue;
+    const prefix = glob.slice(0, -1);
+    if (cmd.startsWith(prefix)) return true;
+  }
+  return false;
+}
+
 export function createBashTool(opts: BashToolOptions = {}): Tool {
   return {
     name: 'bash',
@@ -35,9 +46,10 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
       },
       required: ['command'],
     },
-    async execute(args): Promise<StepOutcome> {
+    async execute(args, ctx: ToolContext): Promise<StepOutcome> {
       const cmd = args.command as string;
-      if (!opts.autoApprove && !isReadOnlyCommand(cmd)) {
+      const skillAllowed = ctx.allowedTools && isAllowedBySkill(cmd, ctx.allowedTools);
+      if (!opts.autoApprove && !isReadOnlyCommand(cmd) && !skillAllowed) {
         return { data: `Command requires approval: ${cmd}. Set autoApprove or use a read-only alternative.`, nextPrompt: null, shouldExit: false, isError: true };
       }
       try {

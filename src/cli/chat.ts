@@ -153,7 +153,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
         const agentInput = `${skillBody}\n\n---\n\n用户要求: ${args || '请帮我处理文件'}`;
         const threadDir = ensureThread(agentInput);
         let textYielded = false;
-        for await (const event of loop.execute(agentInput, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
+        for await (const event of loop.execute(agentInput, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills, allowedTools: matchedSkill.allowedTools })) {
           if (event.type === 'text') {
             textYielded = true;
             process.stdout.write(event.content);

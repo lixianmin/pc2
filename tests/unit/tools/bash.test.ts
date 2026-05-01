@@ -5,6 +5,11 @@ const dummyCtx = {
   turn: 0, index: 0, lmdClient: null as any, dataDir: '/tmp', agentId: 'test', isSubAgent: false, workspaceRoot: '/tmp',
 };
 
+const dummyCtxWithAllowed = (allowedTools: string[]) => ({
+  ...dummyCtx,
+  allowedTools,
+});
+
 describe('bash tool', () => {
   describe('isReadOnlyCommand', () => {
     it('allows ls, cat, git status', () => {
@@ -79,6 +84,38 @@ describe('bash tool', () => {
       const tool = createBashTool({ autoApprove: true, cwd: '/tmp' });
       const result = await tool.execute({ command: 'touch /tmp/bash-test-approval' }, dummyCtx as any);
       expect(String(result.data)).not.toContain('requires approval');
+    });
+  });
+
+  describe('allowedTools whitelist', () => {
+    it('allows pip install when allowedTools matches Bash(pip*)', async () => {
+      const tool = createBashTool({ autoApprove: false });
+      const result = await tool.execute({ command: 'pip install mineru[all]' }, dummyCtxWithAllowed(['Bash(pip*)']) as any);
+      expect(String(result.data)).not.toContain('requires approval');
+    });
+
+    it('allows mineru when allowedTools matches Bash(mineru*)', async () => {
+      const tool = createBashTool({ autoApprove: false });
+      const result = await tool.execute({ command: 'mineru -p input.pdf -o /tmp/out' }, dummyCtxWithAllowed(['Bash(mineru*)']) as any);
+      expect(String(result.data)).not.toContain('requires approval');
+    });
+
+    it('blocks command not in allowedTools', async () => {
+      const tool = createBashTool({ autoApprove: false });
+      const result = await tool.execute({ command: 'rm -rf /' }, dummyCtxWithAllowed(['Bash(pip*)']) as any);
+      expect(String(result.data)).toContain('requires approval');
+    });
+
+    it('blocks when allowedTools is empty', async () => {
+      const tool = createBashTool({ autoApprove: false });
+      const result = await tool.execute({ command: 'pip install foo' }, dummyCtxWithAllowed([]) as any);
+      expect(String(result.data)).toContain('requires approval');
+    });
+
+    it('has no effect when allowedTools is undefined', async () => {
+      const tool = createBashTool({ autoApprove: false });
+      const result = await tool.execute({ command: 'pip install foo' }, dummyCtx as any);
+      expect(String(result.data)).toContain('requires approval');
     });
   });
 });

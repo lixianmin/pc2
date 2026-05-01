@@ -29,6 +29,7 @@ export interface LoopOptions {
   threadDir: string;
   skills?: SkillDefinition[];
   sops?: SkillDefinition[];
+  allowedTools?: string[];
   lmdClient?: LmdMcpClient;
 }
 
@@ -115,6 +116,7 @@ export class AgentLoop {
       agentId: options.agentId ?? 'main',
       isSubAgent,
       workspaceRoot: config.workspaceRoot,
+      allowedTools: options.allowedTools,
     };
 
     const toolStart = Date.now();

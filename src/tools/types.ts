@@ -9,6 +9,7 @@ export interface ToolContext {
   agentId: string;
   isSubAgent: boolean;
   workspaceRoot: string;
+  allowedTools?: string[];
 }
 
 export interface Tool {
