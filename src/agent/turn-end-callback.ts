@@ -11,13 +11,17 @@ export interface CallbackContext {
 
 const COMPLETION_PATTERNS = [
   'task complete',
-  'done',
-  'finished',
   'all steps done',
   'verification passed',
 ];
 
+// `done` and `finished` are common words — use word boundaries to avoid
+// matching substrings like "doner kebab".  Some false positives remain
+// (e.g. "step 3 is done"); the callback is a safety net, not a final arbiter.
+const SINGLE_WORD_COMPLETION = /\b(?:done|finished)\b/i;
+
 function isCompletionClaim(text: string): boolean {
+  if (SINGLE_WORD_COMPLETION.test(text)) return true;
   const lower = text.toLowerCase();
   return COMPLETION_PATTERNS.some((p) => lower.includes(p));
 }

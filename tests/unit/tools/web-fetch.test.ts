@@ -14,6 +14,14 @@ describe('isUrlAllowed (SSRF protection)', () => {
     expect(isUrlAllowed('http://127.0.0.1:3000/api')).toBe(false);
   });
 
+  it('blocks 127.0.0.2 (127.0.0.0/8)', () => {
+    expect(isUrlAllowed('http://127.0.0.2:3000/api')).toBe(false);
+  });
+
+  it('blocks 127.255.255.255 (127.0.0.0/8)', () => {
+    expect(isUrlAllowed('http://127.255.255.255:3000/api')).toBe(false);
+  });
+
   it('blocks private network 10.x', () => {
     expect(isUrlAllowed('http://10.0.0.1/internal')).toBe(false);
   });
@@ -135,6 +143,18 @@ describe('createWebFetchTool execute', () => {
     expect(data).toContain('Repo 99');
     expect(data).toContain('Repo 0');
     expect(data.length).toBeLessThanOrEqual(50000);
+    globalThis.fetch = originalFetch;
+  });
+
+  it('rejects responses over 5MB before buffering', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => new Response('', {
+      headers: { 'content-length': '6000000' },
+    });
+    const tool = createWebFetchTool();
+    const res = await tool.execute({ url: 'https://example.com/huge' }, dummyCtx as any);
+    expect(res.isError).toBe(true);
+    expect(String(res.data)).toContain('too large');
     globalThis.fetch = originalFetch;
   });
 });

@@ -231,3 +231,43 @@ describe('turnEndCallback', () => {
     expect(result).toContain('Plan Reminder');
   });
 });
+
+describe('isCompletionClaim edge cases', () => {
+  const makeCtx = (lastResponse: string): CallbackContext => ({
+    ...baseCtx,
+    planFile: '/plan.md',
+    lastResponse,
+    hasVerificationEvidence: false,
+  });
+
+  it('DOES block on standalone "Done."', () => {
+    expect(turnEndCallback(5, makeCtx('Done.'))).toContain('Blocked');
+  });
+
+  it('DOES block on "I am done."', () => {
+    expect(turnEndCallback(5, makeCtx('I am done.'))).toContain('Blocked');
+  });
+
+  it('DOES block on "All finished."', () => {
+    expect(turnEndCallback(5, makeCtx('All finished.'))).toContain('Blocked');
+  });
+
+  it('does NOT block on "doner kebab" (word-internal, not standalone)', () => {
+    // \bdone\b does not match word-internal "done" in "doner"
+    expect(turnEndCallback(5, makeCtx('order a doner kebab'))).toBeNull();
+  });
+
+  it('blocks "step 3 is done" (standalone word — safety net catches it)', () => {
+    // Word boundary matches "done" as standalone word.
+    // Acceptable tradeoff: callback is a safety net, not a final arbiter.
+    expect(turnEndCallback(5, makeCtx('step 3 is done, moving to step 4'))).toContain('Blocked');
+  });
+
+  it('blocks "I\'m done with the analysis" (standalone word)', () => {
+    expect(turnEndCallback(5, makeCtx('I\'m done with the analysis'))).toContain('Blocked');
+  });
+
+  it('blocks "the build is finished" (standalone word)', () => {
+    expect(turnEndCallback(5, makeCtx('the build is finished, now testing'))).toContain('Blocked');
+  });
+});

@@ -26,13 +26,29 @@ export async function readMeta(threadDir: string): Promise<ThreadMeta | null> {
   }
 }
 
+const updateLocks = new Map<string, Promise<void>>();
+
+async function acquireUpdateLock(threadDir: string): Promise<() => void> {
+  const prev = updateLocks.get(threadDir) ?? Promise.resolve();
+  let release: () => void;
+  const next = new Promise<void>((r) => { release = r; });
+  updateLocks.set(threadDir, next);
+  await prev;
+  return release!;
+}
+
 export async function updateMeta(threadDir: string, patch: Partial<ThreadMeta>): Promise<void> {
-  const existing = await readMeta(threadDir);
-  if (!existing) {
-    throw new Error(`meta.json not found in ${threadDir}`);
+  const release = await acquireUpdateLock(threadDir);
+  try {
+    const existing = await readMeta(threadDir);
+    if (!existing) {
+      throw new Error(`meta.json not found in ${threadDir}`);
+    }
+    const merged: ThreadMeta = { ...existing, ...patch };
+    await writeMeta(threadDir, merged);
+  } finally {
+    release();
   }
-  const merged: ThreadMeta = { ...existing, ...patch };
-  await writeMeta(threadDir, merged);
 }
 
 export async function listThreads(dataDir: string, limit: number = 10): Promise<ThreadMeta[]> { // 10: reasonable default for a single page of recent threads

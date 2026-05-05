@@ -24,12 +24,21 @@ export async function countTokens(text: string): Promise<number> {
 export async function countMessagesTokens(messages: Message[]): Promise<number> {
   let total = 0;
   for (const msg of messages) {
-    total += await countTokens(msg.content);
+    const obj: Record<string, unknown> = {
+      role: msg.role,
+      content: msg.content,
+    };
     if (msg.toolCalls) {
-      for (const tc of msg.toolCalls) {
-        total += await countTokens(JSON.stringify(tc.arguments));
-      }
+      obj.tool_calls = msg.toolCalls.map(tc => ({
+        id: tc.id,
+        type: 'function',
+        function: { name: tc.name, arguments: JSON.stringify(tc.arguments) },
+      }));
     }
+    if (msg.toolCallId) {
+      obj.tool_call_id = msg.toolCallId;
+    }
+    total += await countTokens(JSON.stringify(obj));
   }
   return total;
 }

@@ -25,6 +25,9 @@ export function createFileReadTool(): Tool {
         const content = await readFile(filePath, 'utf-8');
         let lines = content.split('\n');
         const offset = (args.offset as number) ?? 1;
+        if (offset < 1) {
+          return { data: `Invalid offset: ${offset} (must be >= 1)`, nextPrompt: null, shouldExit: false, isError: true };
+        }
         const limit = (args.limit as number) ?? lines.length;
         lines = lines.slice(offset - 1, offset - 1 + limit);
         const numbered = lines.map((l, i) => `${offset + i}: ${l}`).join('\n');

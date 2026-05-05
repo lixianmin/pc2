@@ -12,14 +12,14 @@ export class ToolRegistry {
     name: string,
     args: Record<string, unknown>,
     ctx: ToolContext,
-  ): Promise<StepOutcome | string> {
+  ): Promise<StepOutcome> {
     const tool = this.tools.get(name);
-    if (!tool) return `Unknown tool: ${name}`;
+    if (!tool) return { data: `Unknown tool: ${name}`, nextPrompt: null, shouldExit: false, isError: true };
     try {
       return await tool.execute(args, ctx);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      return `Tool error (${name}): ${msg}`;
+      return { data: `Tool error (${name}): ${msg}`, nextPrompt: null, shouldExit: false, isError: true };
     }
   }
 

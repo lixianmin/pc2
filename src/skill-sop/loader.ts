@@ -5,7 +5,7 @@ import type { SkillDefinition } from './types.js';
 import { logo } from '../lib/logo.js';
 
 export function parseSkillFrontmatter(content: string): Omit<SkillDefinition, 'filePath'> {
-  const match = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) throw new Error('Invalid SKILL.md: missing frontmatter');
   const frontmatter = yaml.load(match[1], { schema: yaml.JSON_SCHEMA }) as Record<string, unknown>;
   return {
@@ -13,7 +13,9 @@ export function parseSkillFrontmatter(content: string): Omit<SkillDefinition, 'f
     description: (frontmatter.description as string) ?? '',
     evolvable: (frontmatter.evolvable as boolean) ?? true,
     allowedTools: frontmatter['allowed-tools']
-      ? String(frontmatter['allowed-tools']).split(/\s+/)
+      ? Array.isArray(frontmatter['allowed-tools'])
+        ? (frontmatter['allowed-tools'] as string[])
+        : String(frontmatter['allowed-tools']).split(/\s+/)
       : undefined,
     body: match[2].trim(),
   };

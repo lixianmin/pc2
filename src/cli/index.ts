@@ -53,11 +53,10 @@ const memoryCmd = program.command('memory').description('Memory operations');
 
 memoryCmd
   .command('add <content>')
-  .option('--type <type>', 'Memory type: fact, episode, relation', 'episode')
-  .action(async (content, opts) => {
+  .action(async (content) => {
     const { LmdMcpClient } = await import('../memory/lmd-client.js');
     const client = new LmdMcpClient({ host: config.lmdHost, port: config.lmdPort });
-    const result = await client.addMemory({ content, type: opts.type });
+    const result = await client.addMemory({ content });
     logo.info('Memory added', { id: result.id });
     console.log(`Added memory: ${result.id}`);
   });
@@ -70,7 +69,7 @@ memoryCmd
     const results = await client.queryMemory({ query });
     logo.info('Memory search results', { count: results.length });
     for (const r of results) {
-      console.log(`[${r.type}] (${r.score.toFixed(2)}) ${r.content}`);
+      console.log(`[${r.collection}] (${r.score.toFixed(2)}) ${r.snippet}`);
     }
   });
 

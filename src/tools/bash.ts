@@ -8,7 +8,7 @@ const execAsync = promisify(exec);
 const READ_ONLY_COMMANDS = [
   'ls', 'cat', 'head', 'tail', 'grep', 'find', 'wc', 'diff', 'stat', 'du',
   'git status', 'git log', 'git diff', 'git branch', 'git show', 'git remote',
-  'pwd', 'which', 'env', 'printenv', 'node -e', 'npx tsc --noEmit',
+  'pwd', 'which', 'env', 'printenv', 'npx tsc --noEmit',
 ];
 
 const SHELL_METACHARACTERS = /[;&\n\r|`$()><!#~{}]/;
@@ -36,6 +36,8 @@ export function isAllowedBySkill(cmd: string, patterns: string[]): boolean {
 }
 
 export function createBashTool(opts: BashToolOptions = {}): Tool {
+  const MAX_OUTPUT = 50000; // ~50KB max output — prevents LLM context flooding from large stdout/stderr
+
   return {
     name: 'bash',
     description: 'Execute shell commands. V1 security: user approval required for non-read-only commands.',
@@ -43,6 +45,7 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
       type: 'object',
       properties: {
         command: { type: 'string', description: 'Shell command to execute' },
+        timeout: { type: 'number', description: 'Timeout in milliseconds (default 30000, max 600000)' },
       },
       required: ['command'],
     },
@@ -53,15 +56,19 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
         return { data: `Command requires approval: ${cmd}. Set autoApprove or use a read-only alternative.`, nextPrompt: null, shouldExit: false, isError: true };
       }
       try {
+        const userTimeout = typeof args.timeout === 'number' ? args.timeout : 30_000;
+        const timeout = Math.min(Math.max(userTimeout, 1_000), 600_000);
         const { stdout, stderr } = await execAsync(cmd, {
-          cwd: opts.cwd,
-          timeout: 30_000, // 30s: balance between allowing slow commands and preventing hangs
+          cwd: opts.cwd ?? ctx.workspaceRoot,
+          timeout,
         });
-        const output = stdout + (stderr ? `\n[stderr]\n${stderr}` : '');
+        let output = stdout + (stderr ? `\n[stderr]\n${stderr}` : '');
+        if (output.length > MAX_OUTPUT) output = output.slice(0, MAX_OUTPUT) + '\n[truncated]';
         return { data: output, nextPrompt: null, shouldExit: false };
       } catch (err: unknown) {
         const e = err as { stdout?: string; stderr?: string; message?: string };
-        const output = (e.stdout ?? '') + (e.stderr ? `\n[stderr]\n${e.stderr}` : '') + (e.message ? `\n[error]\n${e.message}` : '');
+        let output = (e.stdout ?? '') + (e.stderr ? `\n[stderr]\n${e.stderr}` : '') + (e.message ? `\n[error]\n${e.message}` : '');
+        if (output.length > MAX_OUTPUT) output = output.slice(0, MAX_OUTPUT) + '\n[truncated]';
         return { data: output, nextPrompt: null, shouldExit: false };
       }
     },

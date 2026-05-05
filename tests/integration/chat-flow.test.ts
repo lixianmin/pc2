@@ -230,8 +230,8 @@ describe('integration: chat flow', () => {
     );
 
     const memoryHits: MemoryHit[] = [
-      { id: 'm1', content: 'user prefers dark mode', type: 'fact', score: 0.92, createdAt: '2026-01-01' },
-      { id: 'm2', content: 'deployed v2 yesterday', type: 'episode', score: 0.75, createdAt: '2026-01-02' },
+      { chunkId: 1, docId: 'm1', collection: '@episodic', path: '', title: '', score: 0.92, snippet: 'user prefers dark mode', line: 1 },
+      { chunkId: 2, docId: 'm2', collection: '@episodic', path: '', title: '', score: 0.75, snippet: 'deployed v2 yesterday', line: 2 },
     ];
     const mockLmd = {
       queryMemory: vi.fn().mockResolvedValue(memoryHits),

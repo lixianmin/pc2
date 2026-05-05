@@ -46,12 +46,39 @@ describe('bash tool', () => {
       expect(isReadOnlyCommand('echo foo > file')).toBe(false);
       expect(isReadOnlyCommand('echo foo >> file')).toBe(false);
     });
+
+    it('blocks node -e with JS hex-escape bypass', () => {
+      // Shell sees literal \xNN sequences (no metacharacters at shell level).
+      // Node interprets \xNN as characters, bypassing the regex that blocks literal () etc.
+      // \x72\x65\x71\x75\x69\x72\x65 = require
+      // \x28 = (, \x29 = )  -- parens encoded as hex, invisible to shell regex
+      // \x27 = ' (single quote) -- also hex-encoded
+      expect(isReadOnlyCommand('node -e "\\x72\\x65\\x71\\x75\\x69\\x72\\x65\\x28\\x27\\x66\\x73\\x27\\x29"')).toBe(false);
+    });
   });
 
   it('executes a read-only command and returns output', async () => {
     const tool = createBashTool({ autoApprove: true });
     const result = await tool.execute({ command: 'echo hello' }, dummyCtx as any);
     expect(String(result.data)).toContain('hello');
+  });
+
+  it('defaults cwd to workspaceRoot when opts.cwd is not set', async () => {
+    const ctxWithRoot = { ...dummyCtx, workspaceRoot: '/tmp' } as any;
+    const tool = createBashTool({ autoApprove: true });
+    const result = await tool.execute({ command: 'pwd' }, ctxWithRoot);
+    // /tmp may be a symlink on macOS; accept the resolved path
+    const pwd = String(result.data).trim();
+    expect(pwd === '/tmp' || pwd === '/private/tmp').toBe(true);
+  });
+
+  it('truncates oversized output', async () => {
+    // Generate ~60KB of output via printf; the shell will produce it
+    const tool = createBashTool({ autoApprove: true });
+    const result = await tool.execute({ command: 'printf "x%.0s" {1..60000}' }, dummyCtx as any);
+    const data = String(result.data);
+    expect(data.length).toBeLessThanOrEqual(50100); // 50KB + small overhead
+    expect(data).toContain('[truncated]');
   });
 
   it('curl requires approval when autoApprove is false', async () => {

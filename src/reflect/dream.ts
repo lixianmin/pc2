@@ -1,5 +1,5 @@
-import { rename, readdir } from 'fs/promises';
-import { join } from 'path';
+import { rename, readdir, stat } from 'fs/promises';
+import { join, basename } from 'path';
 import { b } from '../../baml_client/index.js';
 import type { LmdMcpClient } from '../memory/lmd-client.js';
 import type { MemoryItem } from '../../baml_client/types.js';
@@ -24,7 +24,15 @@ export async function runDream(
   let threadDirs: string[];
   try {
     const entries = await readdir(threadsDir);
-    threadDirs = entries.map((e) => join(threadsDir, e));
+    const dirs: string[] = [];
+    for (const e of entries) {
+      const full = join(threadsDir, e);
+      try {
+        const s = await stat(full);
+        if (s.isDirectory()) dirs.push(full);
+      } catch {}
+    }
+    threadDirs = dirs;
   } catch {
     return result;
   }
@@ -37,7 +45,7 @@ export async function runDream(
       if (abortSignal?.aborted) break;
 
       try {
-        const base = summaryPath.split('/').pop() ?? '';
+        const base = basename(summaryPath);
         const num = base.replace(/\.md$/, '');
         if (!num) continue;
 
@@ -51,7 +59,7 @@ export async function runDream(
         logo.info('ExtractMemory response', { items_count: memoryItems.length, items: memoryItems });
 
         for (const item of memoryItems) {
-          await lmdClient.addMemory({ content: item.content, type: item.type as 'fact' | 'episode' | 'relation' });
+          await lmdClient.addMemory({ content: item.content });
         }
 
         const newPath = summaryPath.replace(/\.md$/, '.lmd.md');

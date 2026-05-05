@@ -40,6 +40,24 @@ describe('file tools', () => {
       const result = await tool.execute({ path: path.join(TEST_DIR, 'nope.txt') }, dummyCtx);
       expect(String(result.data)).toContain('not found');
     });
+
+    it('rejects offset 0 (produces garbage with negative slice)', async () => {
+      const filePath = path.join(TEST_DIR, 'lines.txt');
+      await fs.writeFile(filePath, 'a\nb\nc\nd\ne', 'utf-8');
+      const tool = createFileReadTool();
+      const result = await tool.execute({ path: filePath, offset: 0, limit: 2 }, dummyCtx);
+      expect(result.isError).toBe(true);
+      expect(String(result.data)).toContain('offset');
+    });
+
+    it('rejects negative offset', async () => {
+      const filePath = path.join(TEST_DIR, 'lines.txt');
+      await fs.writeFile(filePath, 'a\nb\nc', 'utf-8');
+      const tool = createFileReadTool();
+      const result = await tool.execute({ path: filePath, offset: -1, limit: 2 }, dummyCtx);
+      expect(result.isError).toBe(true);
+      expect(String(result.data)).toContain('offset');
+    });
   });
 
   describe('file_write', () => {
@@ -77,6 +95,36 @@ describe('file tools', () => {
       const tool = createFileEditTool();
       const result = await tool.execute({ path: filePath, old_string: 'xyz', new_string: 'abc' }, dummyCtx);
       expect(String(result.data)).toContain('not found');
+    });
+
+    it('rejects empty old_string (would corrupt file)', async () => {
+      const filePath = path.join(TEST_DIR, 'edit3.txt');
+      await fs.writeFile(filePath, 'original content', 'utf-8');
+      const tool = createFileEditTool();
+      const result = await tool.execute({ path: filePath, old_string: '', new_string: 'prefix' }, dummyCtx);
+      expect(result.isError).toBe(true);
+      expect(String(result.data)).toContain('empty');
+      // File must be unchanged
+      const content = await fs.readFile(filePath, 'utf-8');
+      expect(content).toBe('original content');
+    });
+
+    it('replaces all occurrences, not just first', async () => {
+      const filePath = path.join(TEST_DIR, 'edit4.txt');
+      await fs.writeFile(filePath, 'cat dog cat', 'utf-8');
+      const tool = createFileEditTool();
+      await tool.execute({ path: filePath, old_string: 'cat', new_string: 'bird' }, dummyCtx);
+      const content = await fs.readFile(filePath, 'utf-8');
+      expect(content).toBe('bird dog bird');
+    });
+
+    it('replaces single occurrence correctly', async () => {
+      const filePath = path.join(TEST_DIR, 'edit5.txt');
+      await fs.writeFile(filePath, 'foo bar baz', 'utf-8');
+      const tool = createFileEditTool();
+      await tool.execute({ path: filePath, old_string: 'bar', new_string: 'qux' }, dummyCtx);
+      const content = await fs.readFile(filePath, 'utf-8');
+      expect(content).toBe('foo qux baz');
     });
   });
 

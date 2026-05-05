@@ -5,14 +5,23 @@ import { getFrozenFiles, getUnprocessedSummaries } from './history.js';
 import { config } from '../config.js';
 import { logo } from '../lib/logo.js';
 
-const freezeLocks = new Map<string, Promise<boolean>>();
+const lockQueues = new Map<string, Promise<void>>();
+
+async function acquireLock(threadDir: string): Promise<() => void> {
+  const prev = lockQueues.get(threadDir) ?? Promise.resolve();
+  let release: () => void;
+  const next = new Promise<void>((r) => { release = r; });
+  lockQueues.set(threadDir, next);
+  await prev;
+  return release!;
+}
 
 export async function checkAndFreeze(
   threadDir: string,
   tokenCounter: (msgs: any[]) => Promise<number>,
 ): Promise<boolean> {
-  const prev = freezeLocks.get(threadDir) ?? Promise.resolve(false);
-  const next = prev.then(async () => {
+  const release = await acquireLock(threadDir);
+  try {
     const currentFile = join(threadDir, 'messages-current.jsonl');
     const messages = await readJsonl(currentFile);
     if (messages.length === 0) return false;
@@ -27,9 +36,9 @@ export async function checkAndFreeze(
     await rename(currentFile, frozenPath);
     logo.info('Freeze completed', { file: frozenPath, tokens, messages: messages.length });
     return true;
-  });
-  freezeLocks.set(threadDir, next.catch(() => false));
-  return next;
+  } finally {
+    release();
+  }
 }
 
 export async function checkAndSummarize(

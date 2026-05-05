@@ -26,6 +26,17 @@ describe('tokens', () => {
     expect(count).toBeGreaterThan(0);
   });
 
+  it('countMessagesTokens includes structural overhead', async () => {
+    const messages: Message[] = [
+      {
+        id: '3', role: 'assistant', content: '', timestamp: '',
+        toolCalls: [{ name: 'file_read', arguments: { path: '/tmp/x' }, id: 'tc1' }],
+      },
+    ];
+    const count = await countMessagesTokens(messages);
+    expect(count).toBeGreaterThan(0);
+  });
+
   it('concurrent calls share same encoder safely', async () => {
     freeEncoder();
     const results = await Promise.all([

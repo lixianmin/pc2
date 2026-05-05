@@ -191,6 +191,7 @@ Agent 维护此文件，单条简短清晰（<200字）。包含 4 种数据：
 
 ### 2 参考资料
 
+- `/Users/xmli/me/code/others/hermes-agent` - 目前最流程的开源自进化 agent 框架
 - `/Users/xmli/me/code/others/generic-agent` - Python Agent 框架
 - `/Users/xmli/me/code/xvc.agent2` - TypeScript 简易 Agent
 - `/Users/xmli/me/code/lmd` - Golang 的个人知识库和记忆框架

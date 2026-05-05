@@ -1,7 +1,7 @@
 import { mkdirSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { logo, formatTimestamp } from '../lib/logo.js';
-import { AgentLoop } from '../agent/loop.js';
+import { AgentLoop, type AgentEvent } from '../agent/loop.js';
 import { ToolRegistry } from '../tools/registry.js';
 import { createFileReadTool } from '../tools/file-read.js';
 import { createFileWriteTool } from '../tools/file-write.js';
@@ -18,6 +18,85 @@ import { LmdMcpClient } from '../memory/lmd-client.js';
 import { scanSkillDirectory } from '../skill-sop/loader.js';
 import { readMultiline, DEFAULT_SLASH_COMMANDS } from './input.js';
 import select from '@inquirer/select';
+
+const G = '\x1b[90m'; // dim gray
+const C = '\x1b[96m'; // cyan
+const Y = '\x1b[93m'; // yellow
+const R = '\x1b[91m'; // red
+const Gn = '\x1b[92m'; // green
+const N = '\x1b[0m';  // reset
+
+const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+
+interface SpinnerState {
+  msg: string;
+  active: boolean;
+}
+
+function createSpinner(initialMsg: string) {
+  const state: SpinnerState = { msg: initialMsg, active: true };
+  let idx = 0;
+  const interval = setInterval(() => {
+    if (!state.active) return;
+    process.stderr.write(`\r\x1b[K${SPINNER[idx]} ${state.msg}`);
+    idx = (idx + 1) % SPINNER.length;
+  }, 80);
+  return {
+    update: (msg: string) => { state.msg = msg; },
+    stop: (finalMsg?: string) => {
+      state.active = false;
+      clearInterval(interval);
+      if (finalMsg) process.stderr.write(`\r\x1b[K${finalMsg}\n`);
+      else process.stderr.write('\r\x1b[K');
+    },
+  };
+}
+
+function formatDuration(ms: number): string {
+  const s = (ms / 1000).toFixed(1);
+  return s.endsWith('.0') ? s.slice(0, -2) + 's' : s + 's';
+}
+
+let turnNum = 0;
+let agentStartMs = 0;
+
+function renderEvent(event: AgentEvent, spinner: ReturnType<typeof createSpinner>) {
+  switch (event.type) {
+    case 'text':
+      turnNum++;
+      spinner.update(`${G}Turn ${turnNum}${N}`);
+      process.stdout.write(event.content);
+      break;
+
+    case 'tool_call':
+      spinner.update(`${C}⏳ ${event.name}...${N}`);
+      break;
+
+    case 'tool_result': {
+      const r = String(event.result);
+      const isErr = r.length < 200 && (r.includes('Error') || r.includes('error') || r.includes('denied') || r.includes('not found') || r.includes('failed'));
+      const symbol = isErr ? `${R}✗${N}` : `${Gn}✓${N}`;
+      process.stderr.write(`\r\x1b[K${G}  ${symbol} ${event.name}${N}\n`);
+      if (isErr) {
+        process.stdout.write(`\n${R}[tool: ${event.name}]${N} `);
+      }
+      process.stdout.write(r.slice(0, 200));
+      if (r.length > 200) process.stdout.write(`${G}...${N}`);
+      process.stdout.write('\n');
+      break;
+    }
+
+    case 'warning':
+      process.stdout.write(`\n${Y}[!] ${event.content}${N}\n`);
+      break;
+
+    case 'done': {
+      const elapsed = formatDuration(Date.now() - agentStartMs);
+      spinner.stop(`${G}[${event.reason}] ${elapsed}, ${turnNum} turns${N}`);
+      break;
+    }
+  }
+}
 
 export function makeThreadDir(): string {
   const threadsDir = join(config.dataDir, 'threads');
@@ -152,21 +231,11 @@ export async function startChat(options: { initialTask?: string }): Promise<void
         const skillBody = matchedSkill.body ?? '';
         const agentInput = `${skillBody}\n\n---\n\n用户要求: ${args || '请帮我处理文件'}`;
         const threadDir = ensureThread(agentInput);
-        let textYielded = false;
+        turnNum = 0;
+        agentStartMs = Date.now();
+        const spinner = createSpinner(`${G}Thinking...${N}`);
         for await (const event of loop.execute(agentInput, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills, allowedTools: matchedSkill.allowedTools })) {
-          if (event.type === 'text') {
-            textYielded = true;
-            process.stdout.write(event.content);
-          } else if (event.type === 'tool_result') {
-            process.stdout.write(`\n[tool: ${event.name}] ${String(event.result).slice(0, 200)}\n`); // 200 chars: enough to see result summary
-          } else if (event.type === 'warning') {
-            process.stdout.write(`\n[warning] ${event.content}\n`);
-          } else if (event.type === 'done') {
-            if (!textYielded) {
-              logo.warn('Chat loop completed without text output', { reason: event.reason });
-            }
-            process.stdout.write('\n');
-          }
+          renderEvent(event, spinner);
         }
         const meta = await readMeta(threadDir);
         await updateMeta(threadDir, {
@@ -178,21 +247,11 @@ export async function startChat(options: { initialTask?: string }): Promise<void
 
       const threadDir = ensureThread(input);
 
-      let textYielded = false;
+      turnNum = 0;
+      agentStartMs = Date.now();
+      const spinner = createSpinner(`${G}Thinking...${N}`);
       for await (const event of loop.execute(input, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
-        if (event.type === 'text') {
-          textYielded = true;
-          process.stdout.write(event.content);
-        } else if (event.type === 'tool_result') {
-          process.stdout.write(`\n[tool: ${event.name}] ${String(event.result).slice(0, 200)}\n`); // 200 chars: enough to see result summary
-        } else if (event.type === 'warning') {
-          process.stdout.write(`\n[warning] ${event.content}\n`);
-        } else if (event.type === 'done') {
-          if (!textYielded) {
-            logo.warn('Chat loop completed without text output', { reason: event.reason });
-          }
-          process.stdout.write('\n');
-        }
+        renderEvent(event, spinner);
       }
 
       const meta = await readMeta(threadDir);
@@ -205,10 +264,12 @@ export async function startChat(options: { initialTask?: string }): Promise<void
 
   if (options.initialTask) {
     const threadDir = ensureThread(options.initialTask);
+    turnNum = 0;
+    agentStartMs = Date.now();
+    const spinner = createSpinner(`${G}Thinking...${N}`);
     for await (const event of loop.execute(options.initialTask, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
-      if (event.type === 'text') process.stdout.write(event.content);
+      renderEvent(event, spinner);
     }
-    process.stdout.write('\n');
   }
 
   await prompt();

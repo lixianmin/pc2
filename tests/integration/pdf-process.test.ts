@@ -19,8 +19,9 @@ vi.mock('../../baml_client/index.js', () => ({
 
 const PDF_DIR = '/Users/xmli/me/code/claw.cactus/docs/divorce/110二审开庭2';
 const PDF_FILE = join(PDF_DIR, '（2026）京02民终1807号.pdf');
-const EXPECTED_MD = join(PDF_DIR, '（2026）京02民终1807号.md');
-const PYTHON3 = '/tmp/mineru-env/bin/python3';
+const MINERU_ENV = '/tmp/mineru-env';
+const PYTHON3 = `${MINERU_ENV}/bin/python3`;
+const MINERU = `${MINERU_ENV}/bin/mineru`;
 
 describe('PDF processing integration', () => {
   let tempDir: string;
@@ -124,5 +125,40 @@ print(f'OK: {len(pdf.pages)} pages -> {output_md}')
     expect(matched).toBeDefined();
     const args = input.slice(('/' + matched!.name).length).trim();
     expect(args).toBe('/path/to/file.pdf');
+  });
+
+  it('mineru extracts PDF to .md with correct output path', { timeout: 300_000 }, async () => {
+    if (!existsSync(PDF_FILE)) {
+      console.warn('Skipping: PDF file not found at', PDF_FILE);
+      return;
+    }
+    if (!existsSync(MINERU)) {
+      console.warn('Skipping: mineru not installed at', MINERU);
+      return;
+    }
+
+    const outputBase = join(tempDir, 'mineru-out');
+    mkdirSync(outputBase, { recursive: true });
+
+    const scriptPath = join(tempDir, 'run-mineru.sh');
+    writeFileSync(scriptPath, `#!/bin/bash
+source ${MINERU_ENV}/bin/activate
+mineru -p '${PDF_FILE}' -o '${outputBase}'
+echo "EXIT_CODE=$?"
+`);
+    const tool = createBashTool({ autoApprove: true });
+    const result = await tool.execute({
+      command: `bash ${scriptPath}`,
+      timeout: 300_000,
+    }, { turn: 1, index: 0, lmdClient: null, dataDir: '/tmp', agentId: 'test', isSubAgent: false, workspaceRoot: process.cwd() } as any);
+
+    const stem = '（2026）京02民终1807号';
+    const mdPath = join(outputBase, stem, 'hybrid_auto', `${stem}.md`);
+    expect(existsSync(mdPath)).toBe(true);
+
+    const content = readFileSync(mdPath, 'utf-8');
+    expect(content).toContain('民终 1807');
+    expect(content).toContain('上诉人');
+    expect(content.length).toBeGreaterThan(500);
   });
 });

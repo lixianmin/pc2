@@ -13,7 +13,7 @@ export function isUrlAllowed(urlStr: string): boolean {
     const host = parsed.hostname.replace(/^\[|\]$/g, '');
     if (host.includes('::ffff')) return false;
     if (BLOCKED_HOSTS.includes(host)) return false;
-    if (/^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(host)) return false;
+    if (/^(10\.|127\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(host)) return false;
     return true;
   } catch {
     return false;
@@ -46,10 +46,14 @@ export function createWebFetchTool(): Tool {
       }
       try {
         const resp = await fetch(args.url as string, { redirect: 'error' });
+        const MAX_SIZE = 50000; // ~50K chars balances detail vs LLM context window; covers most useful web pages
+        const contentLength = parseInt(resp.headers.get('content-length') ?? '0', 10);
+        // Reject responses larger than 5MB before buffering — prevents OOM
+        if (contentLength > 5_000_000) {
+          return { data: `Response too large (${contentLength} bytes), refused.`, nextPrompt: null, shouldExit: false, isError: true };
+        }
         const contentType = resp.headers.get('content-type') ?? '';
         const text = await resp.text();
-
-        const MAX_SIZE = 50000; // ~50K chars balances detail vs LLM context window; covers most useful web pages
 
         let result: string;
         if (contentType.includes('application/json') || contentType.includes('text/plain') || text.trimStart().startsWith('{') || text.trimStart().startsWith('[')) {

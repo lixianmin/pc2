@@ -7,7 +7,7 @@ import type { ToolContext } from '../../../src/tools/types.js';
 
 const mockLmdClient: any = {
   queryMemory: async () => [
-    { id: '1', content: 'test fact', type: 'fact', score: 0.9, createdAt: '2026-01-01' },
+    { chunkId: 1, docId: 'abc', collection: '@episodic', path: '', title: '', score: 0.9, snippet: 'test fact', line: 1 },
   ],
 };
 
@@ -20,6 +20,23 @@ describe('memory_search tool', () => {
     const tool = createMemorySearchTool();
     const result = await tool.execute({ query: 'test query' }, dummyCtx);
     expect(String(result.data)).toContain('test fact');
+  });
+
+  it('handles non-numeric score without crashing', async () => {
+    const badClient: any = {
+      queryMemory: async () => [
+        { chunkId: 1, docId: 'a', collection: '@episodic', path: '', title: '', score: undefined, snippet: 'fact', line: 1 },
+        { chunkId: 2, docId: 'b', collection: '@knowledge', path: '', title: '', score: null, snippet: 'fact2', line: 2 },
+        { chunkId: 3, docId: 'c', collection: '@episodic', path: '', title: '', score: 'high', snippet: 'fact3', line: 3 },
+      ],
+    };
+    const ctx = { ...dummyCtx, lmdClient: badClient };
+    const tool = createMemorySearchTool();
+    const result = await tool.execute({ query: 'test' }, ctx);
+    // Should not throw — non-numeric scores fall back to '0.00'
+    expect(String(result.data)).toContain('fact');
+    expect(String(result.data)).toContain('fact2');
+    expect(String(result.data)).toContain('fact3');
   });
 });
 

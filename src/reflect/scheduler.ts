@@ -39,6 +39,24 @@ export function createCronSchedulerModule(
             tasks.push(job.task);
             logo.info('Cron job fired', { task: job.task, expression: job.expression });
             lastRuns.set(job.task, prev);
+            // Check for missed intermediate ticks (e.g. scheduler was down for multiple cycles)
+            try {
+              let missed = prev;
+              const iter = CronExpressionParser.parse(job.expression, { tz: job.timezone });
+              iter.reset(new Date(last));
+              let nextInWindow = iter.next().getTime();
+              while (nextInWindow < prev) {
+                missed = nextInWindow;
+                tasks.push(job.task);
+                logo.warn('Missed cron tick caught up', { task: job.task, missedTime: new Date(nextInWindow).toISOString() });
+                nextInWindow = iter.next().getTime();
+              }
+              if (missed !== prev) {
+                lastRuns.set(job.task, prev);
+              }
+            } catch {
+              // Best-effort catchup; if it fails, we still fired the latest tick
+            }
           }
         } catch {
           logo.warn('Invalid cron expression', { expression: job.expression, task: job.task });

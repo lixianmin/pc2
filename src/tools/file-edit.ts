@@ -23,11 +23,14 @@ export function createFileEditTool(): Tool {
       }
       const oldStr = args.old_string as string;
       const newStr = args.new_string as string;
+      if (!oldStr) {
+        return { data: 'old_string must not be empty', nextPrompt: null, shouldExit: false, isError: true };
+      }
       const content = await readFile(filePath, 'utf-8');
       if (!content.includes(oldStr)) {
         return { data: `old_string not found in ${filePath}`, nextPrompt: null, shouldExit: false, isError: true };
       }
-      const updated = content.replace(oldStr, newStr);
+      const updated = content.replaceAll(oldStr, newStr);
       await writeFile(filePath, updated, 'utf-8');
       return { data: `Edited ${filePath}`, nextPrompt: null, shouldExit: false };
     },

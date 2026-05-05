@@ -437,13 +437,13 @@ const parseKittySpecialKey = (s: string): ParsedKey | null => {
 export function parseKeypress(s: Uint8Array | string = ''): ParsedKey {
 	let parts;
 
-	if (s instanceof Uint8Array) {
-		if (s[0]! > 127 && s[1] === undefined) {
-			(s[0] as unknown as number) -= 128;
-			s = '\x1b' + textDecoder.decode(s);
-		} else {
-			s = textDecoder.decode(s);
-		}
+ 	if (s instanceof Uint8Array) {
+ 		if (s[0]! > 127 && s[1] === undefined) {
+ 			const byte = s[0] - 128;
+ 			s = '\x1b' + textDecoder.decode(new Uint8Array([byte]));
+ 		} else {
+ 			s = textDecoder.decode(s);
+ 		}
 	} else if (s !== undefined && typeof s !== 'string') {
 		s = String(s);
 	} else if (!s) {

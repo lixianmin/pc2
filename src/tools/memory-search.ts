@@ -22,7 +22,10 @@ export function createMemorySearchTool(): Tool {
         limit: (args.limit as number) ?? 5,
       });
       const formatted = results
-        .map((r: any) => `[${r.type}] (score: ${r.score.toFixed(2)}) ${r.content}`)
+        .map((r: any) => {
+          const scoreStr = typeof r.score === 'number' ? r.score.toFixed(2) : '0.00';
+          return `[${r.collection}] (score: ${scoreStr}) ${r.snippet}`;
+        })
         .join('\n');
       return { data: formatted || 'No results found.', nextPrompt: null, shouldExit: false };
     },

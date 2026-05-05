@@ -39,7 +39,31 @@ describe('ToolRegistry', () => {
   it('dispatch returns error for unknown tool', async () => {
     const registry = new ToolRegistry();
     const result = await registry.dispatch('nope', {}, dummyCtx);
-    expect(result).toContain('Unknown tool');
+    expect(result.data).toContain('Unknown tool');
+    expect((result as StepOutcome).isError).toBe(true);
+  });
+
+  it('dispatch returns StepOutcome for unknown tool (not string)', async () => {
+    const registry = new ToolRegistry();
+    const result = await registry.dispatch('nope', {}, dummyCtx);
+    expect(result).toHaveProperty('data');
+    expect(result).toHaveProperty('nextPrompt');
+    expect(result).toHaveProperty('shouldExit');
+    expect(result).toHaveProperty('isError');
+  });
+
+  it('dispatch returns StepOutcome for tool execution error', async () => {
+    const errTool: Tool = {
+      name: 'crash_tool',
+      description: 'crashes',
+      parameters: { type: 'object', properties: {} },
+      execute: async () => { throw new Error('boom'); },
+    };
+    const registry = new ToolRegistry();
+    registry.register(errTool);
+    const result = await registry.dispatch('crash_tool', {}, dummyCtx);
+    expect(result.data).toContain('boom');
+    expect((result as StepOutcome).isError).toBe(true);
   });
 
   it('getToolsDescription returns all registered tools', () => {

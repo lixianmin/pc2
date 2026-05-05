@@ -19,7 +19,10 @@ export class LmdMcpClient {
     for (let attempt = 0; attempt <= delays.length; attempt++) {
       try {
         return await this.call(method, params);
-      } catch {
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const isTransient = /ECONNREFUSED|ETIMEDOUT|fetch failed|aborted|MCP HTTP [5]/.test(msg);
+        if (!isTransient) throw err;
         if (attempt < delays.length) {
           logo.warn('MCP call retry', { method, attempt: attempt + 1, delay_ms: delays[attempt] });
           await new Promise(r => setTimeout(r, delays[attempt]));
@@ -60,38 +63,31 @@ export class LmdMcpClient {
   async queryMemory(params: { query: string; limit?: number }): Promise<MemoryHit[]> {
     try {
       const raw = (await this.callWithRetry('tools/call', {
-        name: 'memory_query',
+        name: 'query',
         arguments: { query: params.query, limit: params.limit ?? 5 },
-      })) as Array<{ id: number; content: string; type: string; score: number; created_at: string }>;
-      const results: MemoryHit[] = raw.map(r => ({
-        id: String(r.id),
-        content: r.content,
-        type: r.type as MemoryHit['type'],
-        score: r.score,
-        createdAt: r.created_at,
-      }));
-      logo.info('Memory query', { query_len: params.query.length, hits: results.length });
-      return results;
+      })) as { hits: MemoryHit[] };
+      logo.info('Memory query', { query_len: params.query.length, hits: raw.hits.length });
+      return raw.hits;
     } catch {
       logo.warn('Memory query failed, returning empty', { query_len: params.query.length });
       return [];
     }
   }
 
-  async addMemory(params: { content: string; type: 'fact' | 'episode' | 'relation' }): Promise<{ id: string }> {
+  async addMemory(params: { content: string }): Promise<{ id: string }> {
     const raw = (await this.callWithRetry('tools/call', {
       name: 'memory_add',
-      arguments: { content: params.content, type: params.type },
+      arguments: { content: params.content },
     })) as { id: number };
     const id = String(raw.id);
-    logo.info('Memory add', { type: params.type, content_len: params.content.length, id });
+    logo.info('Memory add', { content_len: params.content.length, id });
     return { id };
   }
 
   async deleteMemory(params: { id: string }): Promise<void> {
     await this.callWithRetry('tools/call', {
       name: 'memory_delete',
-      arguments: { id: params.id },
+      arguments: { id: Number(params.id) },
     });
   }
 }

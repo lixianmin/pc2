@@ -27,9 +27,12 @@ export interface StepOutcome {
 }
 
 export interface MemoryHit {
-  id: string;
-  content: string;
-  type: 'fact' | 'episode' | 'relation';
+  chunkId: number;
+  docId: string;
+  collection: string;
+  path: string;
+  title: string;
   score: number;
-  createdAt: string;
+  snippet: string;
+  line: number;
 }

@@ -47,7 +47,7 @@ describe('LmdMcpClient', () => {
 
   describe('queryMemory', () => {
     it('sends correct MCP request format', async () => {
-      mockFetch.mockResolvedValueOnce(mcpResponse(1, []));
+      mockFetch.mockResolvedValueOnce(mcpResponse(1, { hits: [] }));
       await client.queryMemory({ query: 'hello', limit: 3 });
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
@@ -57,36 +57,36 @@ describe('LmdMcpClient', () => {
       const body = JSON.parse(opts.body);
       expect(body.jsonrpc).toBe('2.0');
       expect(body.method).toBe('tools/call');
-      expect(body.params).toEqual({ name: 'memory_query', arguments: { query: 'hello', limit: 3 } });
+      expect(body.params).toEqual({ name: 'query', arguments: { query: 'hello', limit: 3 } });
     });
 
     it('defaults limit to 5 when not specified', async () => {
-      mockFetch.mockResolvedValueOnce(mcpResponse(1, []));
+      mockFetch.mockResolvedValueOnce(mcpResponse(1, { hits: [] }));
       await client.queryMemory({ query: 'test' });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
       expect(body.params.arguments.limit).toBe(5);
     });
 
-    it('returns multiple memory hits with all types', async () => {
-      const raw = [
-        { id: 1, content: 'likes python', type: 'fact', score: 0.95, created_at: '2026-01-01' },
-        { id: 2, content: 'visited Tokyo', type: 'episode', score: 0.8, created_at: '2026-02-01' },
-        { id: 3, content: 'friend of Alice', type: 'relation', score: 0.7, created_at: '2026-03-01' },
-      ];
+    it('returns multiple memory hits with all collections', async () => {
+      const raw = {
+        hits: [
+          { chunkId: 1, docId: 'abc12345', collection: '@episodic', path: '/@memory/abc', title: '', score: 0.95, snippet: 'likes python', line: 1 },
+          { chunkId: 2, docId: 'def67890', collection: '@knowledge', path: '/@memory/def', title: '', score: 0.80, snippet: 'visited Tokyo', line: 2 },
+        ],
+      };
       mockFetch.mockResolvedValueOnce(mcpResponse(1, raw));
 
       const results = await client.queryMemory({ query: 'test' });
-      expect(results).toHaveLength(3);
-      expect(results[0].id).toBe('1');
-      expect(results[0].createdAt).toBe('2026-01-01');
-      expect(results[0].type).toBe('fact');
-      expect(results[1].type).toBe('episode');
-      expect(results[2].type).toBe('relation');
+      expect(results).toHaveLength(2);
+      expect(results[0].docId).toBe('abc12345');
+      expect(results[0].collection).toBe('@episodic');
+      expect(results[0].snippet).toBe('likes python');
+      expect(results[1].collection).toBe('@knowledge');
     });
 
     it('returns empty array when no matches', async () => {
-      mockFetch.mockResolvedValueOnce(mcpResponse(1, []));
+      mockFetch.mockResolvedValueOnce(mcpResponse(1, { hits: [] }));
       const results = await client.queryMemory({ query: 'nonexistent' });
       expect(results).toEqual([]);
     });
@@ -111,17 +111,17 @@ describe('LmdMcpClient', () => {
 
     it('retries once then succeeds', async () => {
       mockFetch
-        .mockRejectedValueOnce(new Error('timeout'))
-        .mockResolvedValueOnce(mcpResponse(2, [{ id: 1, content: 'found', type: 'fact', score: 0.9, created_at: '2026-01-01' }]));
+        .mockRejectedValueOnce(new Error('fetch failed')) // Node fetch network error
+        .mockResolvedValueOnce(mcpResponse(2, { hits: [{ chunkId: 1, docId: 'abc', collection: '@episodic', path: '', title: '', score: 0.9, snippet: 'found', line: 1 }] }));
 
       const results = await drainRetry(client.queryMemory({ query: 'test' }));
       expect(results).toHaveLength(1);
-      expect(results[0].content).toBe('found');
+      expect(results[0].snippet).toBe('found');
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
 
     it('retries 3 times (4 total calls) then gives up', async () => {
-      mockFetch.mockRejectedValue(new Error('fail'));
+      mockFetch.mockRejectedValue(new Error('fetch failed')); // Node fetch network error
 
       const results = await drainRetry(client.queryMemory({ query: 'test' }));
       expect(results).toEqual([]);
@@ -130,52 +130,46 @@ describe('LmdMcpClient', () => {
   });
 
   describe('addMemory', () => {
-    it('sends correct MCP request for fact type', async () => {
-      mockFetch.mockResolvedValueOnce(mcpResponse(1, { id: 42, type: 'fact' }));
-      await client.addMemory({ content: 'test fact', type: 'fact' });
+    it('sends correct MCP request (no type field)', async () => {
+      mockFetch.mockResolvedValueOnce(mcpResponse(1, { id: 42 }));
+      await client.addMemory({ content: 'test fact' });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.params).toEqual({ name: 'memory_add', arguments: { content: 'test fact', type: 'fact' } });
+      expect(body.params).toEqual({ name: 'memory_add', arguments: { content: 'test fact' } });
     });
 
-    it('handles episode type', async () => {
-      mockFetch.mockResolvedValueOnce(mcpResponse(1, { id: 43, type: 'episode' }));
-      const result = await client.addMemory({ content: 'went hiking', type: 'episode' });
+    it('returns the numeric id from LMD', async () => {
+      mockFetch.mockResolvedValueOnce(mcpResponse(1, { id: 43 }));
+      const result = await client.addMemory({ content: 'went hiking' });
       expect(result.id).toBe('43');
-    });
-
-    it('handles relation type', async () => {
-      mockFetch.mockResolvedValueOnce(mcpResponse(1, { id: 44, type: 'relation' }));
-      const result = await client.addMemory({ content: 'Bob is colleague of Alice', type: 'relation' });
-      expect(result.id).toBe('44');
     });
 
     it('throws after retries exhausted', async () => {
       mockFetch.mockRejectedValue(new Error('ECONNREFUSED'));
-      await expect(drainRetry(client.addMemory({ content: 'test', type: 'fact' })))
+      await expect(drainRetry(client.addMemory({ content: 'test' })))
         .rejects.toThrow('MCP call failed after 3 retries');
     });
   });
 
   describe('deleteMemory', () => {
-    it('sends correct MCP request', async () => {
+    it('sends correct MCP request with numeric id', async () => {
       mockFetch.mockResolvedValueOnce(mcpResponse(1, null));
       await client.deleteMemory({ id: '42' });
 
       const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-      expect(body.params).toEqual({ name: 'memory_delete', arguments: { id: '42' } });
+      expect(body.params).toEqual({ name: 'memory_delete', arguments: { id: 42 } });
     });
   });
 
   describe('JSON-RPC id increment', () => {
     it('increments id on each call', async () => {
       mockFetch
-        .mockResolvedValueOnce(mcpResponse(1, []))
-        .mockResolvedValueOnce(mcpResponse(2, { id: '1' }))
+        .mockResolvedValueOnce(mcpResponse(1, { hits: [] }))
+        .mockResolvedValueOnce(mcpResponse(2, { id: 1 }))
         .mockResolvedValueOnce(mcpResponse(3, null));
 
       await client.queryMemory({ query: 'a' });
-      await client.addMemory({ content: 'b', type: 'fact' });
+      await client.addMemory({ content: 'b' });
       await client.deleteMemory({ id: '1' });
 
       const ids = mockFetch.mock.calls.map((call: [string, RequestInit]) => JSON.parse(call[1].body).id);

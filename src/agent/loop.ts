@@ -1,7 +1,7 @@
 import { b } from '../../baml_client/index.js';
 import type { ChatResponse } from '../../baml_client/types.js';
 import type { ToolRegistry } from '../tools/registry.js';
-import type { StepOutcome, MemoryHit } from '../types.js';
+import type { MemoryHit } from '../types.js';
 import { turnEndCallback } from './turn-end-callback.js';
 import type { CallbackContext } from './turn-end-callback.js';
 import { appendMessage } from '../storage/jsonl.js';
@@ -9,6 +9,7 @@ import { formatSkillList } from './prompt.js';
 import { checkAndFreeze, checkAndSummarize } from '../storage/summary.js';
 import { assembleContext } from '../storage/context.js';
 import { countMessagesTokens } from '../storage/tokens.js';
+import { findActivePlanFile } from '../storage/plan-file.js';
 import type { LmdMcpClient } from '../memory/lmd-client.js';
 import type { SkillDefinition } from '../skill-sop/types.js';
 import { config } from '../config.js';
@@ -122,12 +123,12 @@ export class AgentLoop {
     const toolStart = Date.now();
     logo.info('Tool call start', { turn, name: tc.name, args_len: tc.arguments.length });
     const result = await this.registry.dispatch(tc.name, args, toolCtx);
-    const resultStr = typeof result === 'string' ? result : JSON.stringify((result as StepOutcome).data);
+    const resultStr = JSON.stringify(result.data);
     logo.info('Tool call done', { turn, name: tc.name, latency_ms: Date.now() - toolStart, result_len: resultStr.length });
 
     yield { type: 'tool_result', name: tc.name, call_id: tc.id, result: resultStr };
 
-    const isFailure = typeof result !== 'string' && (result as StepOutcome).isError === true;
+    const isFailure = result.isError === true;
 
     if (isFailure) {
       if (tc.name === state.lastFailedTool) {
@@ -143,7 +144,7 @@ export class AgentLoop {
 
     await appendMessage(threadDir, 'tool', resultStr, { toolCallId: tc.id });
 
-    if (typeof result !== 'string' && (result as StepOutcome).shouldExit) {
+    if (result.shouldExit) {
       yield { type: 'done', reason: 'ask_user' };
       return { shouldExit: true, resultStr };
     }
@@ -157,8 +158,9 @@ export class AgentLoop {
     consecutiveFailures: number,
     lastFailedTool: string | null,
   ): AsyncGenerator<AgentEvent, void> {
+    const planFile = await findActivePlanFile(config.tempDir);
     const callbackCtx: CallbackContext = {
-      planFile: null,
+      planFile,
       lastResponse: response.text ?? '',
       dataDir: config.dataDir,
       hasVerificationEvidence: response.tool_calls?.some(tc => tc.name === 'spawn_agent') ?? false,
@@ -229,7 +231,7 @@ export class AgentLoop {
       const contextBlock = `[Context]\nTime: ${timeStr}\nTurn: ${turn}\n\n[User Message]\n${userMessage}`;
       let relevantMemory = '';
       if (memoryHits.length > 0) {
-        relevantMemory = memoryHits.map((m) => `- (${m.type}, score: ${m.score.toFixed(2)}) ${m.content}`).join('\n');
+        relevantMemory = memoryHits.map((m) => `- (${m.collection}, score: ${m.score.toFixed(2)}) ${m.snippet}`).join('\n');
       }
 
       const response = yield* this.callLlm(turn, messages, toolsDesc, skillsList, sopsList, contextBlock, relevantMemory);

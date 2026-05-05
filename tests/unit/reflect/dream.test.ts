@@ -46,7 +46,7 @@ describe('Dream', () => {
 
     const result = await runDream(TEST_DIR, mockLmd as LmdMcpClient);
     expect(result.processed).toBe(1);
-    expect(mockLmd.addMemory).toHaveBeenCalledWith({ content: 'User prefers dark mode', type: 'fact' });
+    expect(mockLmd.addMemory).toHaveBeenCalledWith({ content: 'User prefers dark mode' });
 
     const files = await fs.readdir(path.join(THREAD_DIR, 'summaries'));
     expect(files).toContain('001.lmd.md');
