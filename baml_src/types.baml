@@ -1,7 +1,7 @@
 class ToolCall {
-  name string
+  name string @assert(has_name, {{ this != "" }})
   arguments string
-  id string
+  id string @assert(has_id, {{ this != "" }})
 }
 
 class ChatResponse {

@@ -55,6 +55,9 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
     },
     async execute(args, ctx: ToolContext): Promise<StepOutcome> {
       const cmd = args.command as string;
+      if (!cmd || typeof cmd !== 'string') {
+        return { data: `Missing required parameter: command`, nextPrompt: null, shouldExit: false, isError: true };
+      }
       const skillAllowed = ctx.allowedTools && isAllowedBySkill(cmd, ctx.allowedTools);
       if (!opts.autoApprove && !isReadOnlyCommand(cmd) && !skillAllowed) {
         return { data: `Command requires approval: ${cmd}. Set autoApprove or use a read-only alternative.`, nextPrompt: null, shouldExit: false, isError: true };
