@@ -15,12 +15,14 @@ import type { SkillDefinition } from '../skill-sop/types.js';
 import { config } from '../config.js';
 import { logo } from '../lib/logo.js';
 
+export type DoneReason = 'ask_user' | 'max_rounds' | 'timeout' | 'stalled' | 'anti_loop' | 'llm_error';
+
 export type AgentEvent =
   | { type: 'text'; content: string }
   | { type: 'tool_call'; name: string; args: string; call_id: string }
   | { type: 'tool_result'; name: string; call_id: string; result: string }
   | { type: 'warning'; content: string }
-  | { type: 'done'; reason: string };
+  | { type: 'done'; reason: DoneReason };
 
 export interface LoopOptions {
   maxRounds?: number;
@@ -208,6 +210,7 @@ export class AgentLoop {
 
     let inMemory = '';
     let lastAssistantText = '';
+    let consecutiveNoTools = 0;
     const state = { consecutiveFailures: 0, lastFailedTool: null as string | null };
 
     for (let turn = 1; turn <= maxRounds; turn++) {
@@ -231,7 +234,7 @@ export class AgentLoop {
       const contextBlock = `[Context]\nTime: ${timeStr}\nTurn: ${turn}\n\n[User Message]\n${userMessage}`;
       let relevantMemory = '';
       if (memoryHits.length > 0) {
-        relevantMemory = memoryHits.map((m) => `- (${m.collection}, score: ${m.score.toFixed(2)}) ${m.snippet}`).join('\n');
+        relevantMemory = memoryHits.map((m) => `- (${m.collection}, score: ${m.score?.toFixed(2) ?? 'N/A'}) ${m.snippet}`).join('\n');
       }
 
       const response = yield* this.callLlm(turn, messages, toolsDesc, skillsList, sopsList, contextBlock, relevantMemory);
@@ -243,13 +246,18 @@ export class AgentLoop {
       }
 
       const hasTools = yield* this.handleResponse(turn, response, threadDir);
-      if (!hasTools) {
-        logo.info('Agent loop done', { reason: 'completed', turns: turn, elapsed_ms: Date.now() - startTime });
-        yield { type: 'done', reason: 'completed' };
-        return;
+      if (hasTools) {
+        consecutiveNoTools = 0;
+      } else {
+        consecutiveNoTools++;
+        if (consecutiveNoTools >= 3) {
+          logo.info('Agent loop done', { reason: 'stalled', turns: turn, elapsed_ms: Date.now() - startTime });
+          yield { type: 'done', reason: 'stalled' };
+          return;
+        }
       }
 
-      for (const tc of response.tool_calls!) {
+      if (hasTools) for (const tc of response.tool_calls!) {
         inMemory += `[Tool Call: ${tc.name}](${tc.arguments})\n\n`;
         const { shouldExit, resultStr } = yield* this.executeToolCall(turn, tc, threadDir, mergedOptions, isSubAgent, state);
         inMemory += `[Tool Result: ${tc.name}]\n${resultStr}\n\n`;
@@ -257,6 +265,12 @@ export class AgentLoop {
           logo.info('Agent loop done', { reason: 'ask_user', turns: turn, elapsed_ms: Date.now() - startTime });
           return;
         }
+      }
+
+      if (state.consecutiveFailures >= config.antiLoopThreshold) {
+        logo.warn('Agent loop done', { reason: 'anti_loop', turns: turn, failedTool: state.lastFailedTool, consecutiveFailures: state.consecutiveFailures, elapsed_ms: Date.now() - startTime });
+        yield { type: 'done', reason: 'anti_loop' };
+        return;
       }
 
       yield* this.postTurn(turn, response, threadDir, state.consecutiveFailures, state.lastFailedTool);

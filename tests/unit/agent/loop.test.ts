@@ -41,9 +41,9 @@ describe('AgentLoop', () => {
     return dir;
   }
 
-  it('exits on text-only response (no tool calls)', async () => {
+  it('exits after 3 consecutive turns with no tool calls (stalled)', async () => {
     const { b } = await import('../../../baml_client/index.js');
-    (b.AgentChat as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+    (b.AgentChat as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: 'Hello! How can I help?',
       tool_calls: [],
     });
@@ -57,7 +57,7 @@ describe('AgentLoop', () => {
     }
     const textEvents = events.filter((e) => e.type === 'text');
     expect(textEvents.length).toBeGreaterThan(0);
-    expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'completed' });
+    expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'stalled' });
   });
 
   it('dispatches tool calls and continues loop', async () => {
@@ -140,7 +140,7 @@ describe('AgentLoop', () => {
     }
     const truncWarnings = events.filter(e => e.type === 'warning' && String(e.content).includes('truncated'));
     expect(truncWarnings).toHaveLength(0);
-    expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'completed' });
+    expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'stalled' });
   });
 
   it('persists user messages to JSONL when threadDir is set', async () => {

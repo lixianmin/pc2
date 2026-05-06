@@ -19,7 +19,7 @@ export function createFileReadTool(): Tool {
     async execute(args, ctx): Promise<StepOutcome> {
       const filePath = args.path as string;
       if (!isPathWithinRoot(filePath, ctx.workspaceRoot)) {
-        return { data: `Access denied: path outside workspace (${filePath})`, nextPrompt: null, shouldExit: false, isError: true };
+        return { data: `Access denied: path outside workspace (${filePath}). Use ask_user to request permission, or copy the file into the workspace.`, nextPrompt: null, shouldExit: false, isError: true };
       }
       try {
         const content = await readFile(filePath, 'utf-8');

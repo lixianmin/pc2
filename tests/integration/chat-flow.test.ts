@@ -83,12 +83,12 @@ describe('integration: chat flow', () => {
     const events1 = await collectEvents(loop, 'find top 2 projects', { threadDir, dataDir: tempDir });
     const events2 = await collectEvents(loop, 'what is the second project?', { threadDir, dataDir: tempDir });
 
-    expect(events1[events1.length - 1]).toEqual({ type: 'done', reason: 'completed' });
-    expect(events2[events2.length - 1]).toEqual({ type: 'done', reason: 'completed' });
+    expect(events1[events1.length - 1]).toEqual({ type: 'done', reason: 'stalled' });
+    expect(events2[events2.length - 1]).toEqual({ type: 'done', reason: 'stalled' });
 
-    expect(historyCapture[2]).toContain('[User]\nfind top 2 projects');
-    expect(historyCapture[2]).toContain('[User]\nwhat is the second project?');
-    expect(historyCapture[2]).toContain('Project A and Project B');
+    expect(historyCapture[4]).toContain('[User]\nfind top 2 projects');
+    expect(historyCapture[4]).toContain('[User]\nwhat is the second project?');
+    expect(historyCapture[4]).toContain('Project A and Project B');
 
     const jsonlPath = join(threadDir, 'messages-current.jsonl');
     expect(existsSync(jsonlPath)).toBe(true);
@@ -203,7 +203,7 @@ describe('integration: chat flow', () => {
     expect(result.task).toBe('search the web for X');
   });
 
-  it('anti-loop triggers after consecutive failures', async () => {
+  it('anti-loop exits after consecutive failures', async () => {
     const { b } = await import('../../baml_client/index.js');
     (b.AgentChat as ReturnType<typeof vi.fn>).mockResolvedValue({
       text: 'Trying again.',
@@ -214,9 +214,7 @@ describe('integration: chat flow', () => {
     const loop = new AgentLoop(registry);
     const events = await collectEvents(loop, 'fetch broken', { maxRounds: 5 });
 
-    const warningEvents = events.filter(e => e.type === 'warning' && String(e.content).includes('Anti-Loop'));
-    expect(warningEvents.length).toBeGreaterThan(0);
-    expect(events[events.length - 1].type).toBe('done');
+    expect(events[events.length - 1]).toEqual({ type: 'done', reason: 'anti_loop' });
   });
 
   it('passes LMD memory hits as relevantMemory to BAML', async () => {

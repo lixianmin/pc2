@@ -27,12 +27,7 @@ function isCompletionClaim(text: string): boolean {
 }
 
 export function turnEndCallback(turn: number, ctx: CallbackContext): string | null {
-  // Priority 1: consecutive tool failures — most urgent anti-loop signal
-  if (ctx.consecutiveFailures >= config.antiLoopThreshold && ctx.lastFailedTool) {
-    return `[Anti-Loop] Tool "${ctx.lastFailedTool}" has failed ${ctx.consecutiveFailures} times consecutively. You MUST use a completely different approach or use ask_user to ask for guidance. Do NOT call ${ctx.lastFailedTool} again.`;
-  }
-
-  // Priority 2: periodic anti-loop check
+  // Priority 1: periodic anti-loop check (consecutive-failure exit handled in loop.ts)
   if (turn > 0 && turn % config.antiLoopInterval === 0) {
     return `[Anti-Loop Warning] Turn ${turn}: you may be repeating a failed approach. Change strategy.`;
   }

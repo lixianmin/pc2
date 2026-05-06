@@ -25,12 +25,16 @@ export interface BashToolOptions {
 }
 
 export function isAllowedBySkill(cmd: string, patterns: string[]): boolean {
+  // Split on && and ; so "source env && uv pip install" matches "uv*"
+  const segments = cmd.split(/&&|;/).map(s => s.trim()).filter(Boolean);
   for (const p of patterns) {
     if (!p.startsWith('Bash(') || !p.endsWith(')')) continue;
     let glob = p.slice(5, -1);
     if (!glob.endsWith('*')) continue;
     const prefix = glob.slice(0, -1);
-    if (cmd.startsWith(prefix)) return true;
+    for (const seg of segments) {
+      if (seg.startsWith(prefix)) return true;
+    }
   }
   return false;
 }

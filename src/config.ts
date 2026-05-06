@@ -6,7 +6,8 @@ export const config = {
   // Freeze messages when token count reaches 30% of context window (leaves room for system prompt + response)
   freezeThreshold: () => config.modelContextWindow * 0.3,
   // Max agent loop rounds before forced stop — prevents infinite loops
-  maxRounds: 30,
+  // 1000 rounds as absolute safety net — real termination via ask_user/anti_loop/timeout
+  maxRounds: 1000,
   // Max sub-agent rounds (sub-agents should complete tasks faster)
   subAgentMaxRounds: 15,
   // 20 min timeout for main agent — complex tasks with tool calls need time
@@ -15,12 +16,12 @@ export const config = {
   subAgentTimeoutMs: 10 * 60 * 1000,
   // Warn about possible loop every N turns
   antiLoopInterval: 7,
-  // Force ask_user injection after this many turns — prevents agent from running indefinitely
-  forceAskUserTurn: 25,
+  // Force ask_user injection after this many turns — 5% of maxRounds
+  forceAskUserTurn: 50,
   // Anti-loop threshold: abort if this many consecutive failures
   antiLoopThreshold: 3,
-  // Danger turn threshold: hard stop with warning
-  dangerTurnThreshold: 60,
+  // Danger turn threshold: 20% of maxRounds — alert user, 80% budget remains
+  dangerTurnThreshold: 200,
   // 1 min heartbeat interval for sub-agent liveness checks
   subAgentHeartbeatMs: 60 * 1000,
   // LMD memory service port
