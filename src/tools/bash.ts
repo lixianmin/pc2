@@ -87,7 +87,7 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
 
       const skillAllowed = ctx.allowedTools && isAllowedBySkill(cmd, ctx.allowedTools);
 
-      if (perm.action === 'allow' || skillAllowed) {
+      if (perm.action === 'allow' || skillAllowed || ctx.subAgentAutoApprove) {
         return execBash(cmd, args.timeout as number | undefined, ctx.workspaceRoot, opts.cwd);
       }
 

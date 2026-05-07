@@ -120,6 +120,8 @@ export class AgentLoop {
       isSubAgent,
       workspaceRoot: config.workspaceRoot,
       allowedTools: options.allowedTools,
+      subAgentAutoApprove: config.subAgentAutoApprove && isSubAgent,
+      mode: config.mode,
     };
 
     const toolStart = Date.now();

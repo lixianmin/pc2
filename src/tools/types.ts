@@ -10,6 +10,8 @@ export interface ToolContext {
   isSubAgent: boolean;
   workspaceRoot: string;
   allowedTools?: string[];
+  subAgentAutoApprove?: boolean;
+  mode?: string;
 }
 
 export interface Tool {
