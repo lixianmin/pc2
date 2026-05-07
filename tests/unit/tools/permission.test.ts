@@ -23,6 +23,15 @@ describe('extractPrefix', () => {
   });
 });
 
+import { askUserKeypress } from '../../../src/tools/permission.js';
+
+describe('askUserKeypress', () => {
+  it('returns n when stdin is not TTY', async () => {
+    const result = await askUserKeypress('test question');
+    expect(result).toBe('n');
+  });
+});
+
 describe('classifyCommand', () => {
   it('classifies ls as allow', () => {
     expect(classifyCommand('ls -la')).toEqual({ action: 'allow', prefix: 'ls' });

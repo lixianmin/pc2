@@ -70,3 +70,51 @@ export function classifyCommand(cmd: string): PermissionResult {
 
   return { action: 'ask', prefix };
 }
+
+import { parseKeypress } from '../cli/parse-keypress.js';
+
+export type AskResponse = 'y' | 'n' | 'a' | 'r';
+
+export function askUserKeypress(question: string, timeoutMs = 60000): Promise<AskResponse> {
+  return new Promise((resolve) => {
+    const stdin = process.stdin;
+    if (!stdin.isTTY) {
+      resolve('n');
+      return;
+    }
+
+    process.stdout.write(`\n${question}\n\n`);
+    process.stdout.write('  [y] Allow once   [n] Deny once\n');
+    process.stdout.write('  [a] Always allow  [r] Reject all\n');
+    process.stdout.write('\n> ');
+
+    const prevRaw = stdin.isRaw;
+    stdin.setRawMode(true);
+    stdin.resume();
+
+    const timer = setTimeout(() => {
+      cleanup();
+      process.stdout.write('(timeout, denied)\n');
+      resolve('n');
+    }, timeoutMs);
+
+    const onData = (buf: Buffer) => {
+      const key = parseKeypress(buf);
+      const ch = key.name === '' ? key.sequence?.toLowerCase() : key.name?.toLowerCase();
+      if (ch === 'y' || ch === 'n' || ch === 'a' || ch === 'r') {
+        cleanup();
+        process.stdout.write(`${ch}\n`);
+        resolve(ch as AskResponse);
+      }
+    };
+
+    const cleanup = () => {
+      clearTimeout(timer);
+      stdin.removeListener('data', onData);
+      stdin.setRawMode(prevRaw ?? false);
+      stdin.pause();
+    };
+
+    stdin.on('data', onData);
+  });
+}
