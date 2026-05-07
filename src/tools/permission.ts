@@ -1,5 +1,40 @@
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
 import type { AgentMode } from './mode.js';
 import { parseKeypress } from '../cli/parse-keypress.js';
+
+export interface PermissionStore {
+  bash: Record<string, boolean>;
+  external_read: Record<string, boolean>;
+  external_write: Record<string, boolean>;
+}
+
+function permissionsPath(dataDir: string): string {
+  return join(dataDir, 'permissions.json');
+}
+
+export function loadPermissions(dataDir: string): PermissionStore {
+  const path = permissionsPath(dataDir);
+  if (!existsSync(path)) return { bash: {}, external_read: {}, external_write: {} };
+  try {
+    return JSON.parse(readFileSync(path, 'utf-8'));
+  } catch {
+    return { bash: {}, external_read: {}, external_write: {} };
+  }
+}
+
+export function savePermission(
+  dataDir: string,
+  category: keyof PermissionStore,
+  pattern: string,
+  allowed: boolean
+): void {
+  const store = loadPermissions(dataDir);
+  store[category][pattern] = allowed;
+  const path = permissionsPath(dataDir);
+  mkdirSync(dataDir, { recursive: true });
+  writeFileSync(path, JSON.stringify(store, null, 2));
+}
 
 export const PermissionAction = {
   DENY: 'deny',
@@ -76,10 +111,24 @@ export function classifyCommand(cmd: string): PermissionResult {
 
 export type AskResponse = 'y' | 'n' | 'a' | 'r';
 
-export function askUserKeypress(question: string, mode: AgentMode = 'default', timeoutMs = 60000): Promise<AskResponse> {
+export function askUserKeypress(
+  question: string,
+  mode: AgentMode = 'default',
+  timeoutMs = 60000,
+  dataDir?: string,
+  category?: string,
+  pattern?: string,
+): Promise<AskResponse> {
   return new Promise((resolve) => {
     if (mode === 'yolo') { resolve('a'); return; }
     if (mode === 'plan') { resolve('n'); return; }
+
+    if (dataDir && category && pattern) {
+      const stored = loadPermissions(dataDir);
+      const entry = stored[category as keyof PermissionStore]?.[pattern];
+      if (entry === true) { resolve('a'); return; }
+      if (entry === false) { resolve('n'); return; }
+    }
 
     const stdin = process.stdin;
     if (!stdin.isTTY) {
@@ -106,6 +155,9 @@ export function askUserKeypress(question: string, mode: AgentMode = 'default', t
       const key = parseKeypress(buf);
       const ch = key.name === '' ? key.sequence?.toLowerCase() : key.name?.toLowerCase();
       if (ch === 'y' || ch === 'n' || ch === 'a' || ch === 'r') {
+        if (ch === 'a' && dataDir && category && pattern) {
+          savePermission(dataDir, category as keyof PermissionStore, pattern, true);
+        }
         cleanup();
         process.stdout.write(`${ch}\n`);
         resolve(ch as AskResponse);

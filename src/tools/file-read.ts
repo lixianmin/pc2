@@ -2,6 +2,9 @@ import { readFile, open } from 'fs/promises';
 import type { Tool } from './types.js';
 import type { StepOutcome } from '../types.js';
 import { isPathWithinRoot } from './path-sandbox.js';
+import { askUserKeypress } from './permission.js';
+import { config } from '../config.js';
+import type { AgentMode } from './mode.js';
 
 export function createFileReadTool(): Tool {
   return {
@@ -19,7 +22,17 @@ export function createFileReadTool(): Tool {
     async execute(args, ctx): Promise<StepOutcome> {
       const filePath = args.path as string;
       if (!isPathWithinRoot(filePath, ctx.workspaceRoot)) {
-        return { data: `Access denied: path outside workspace (${filePath}). Use ask_user to request permission, or copy the file into the workspace.`, nextPrompt: null, shouldExit: false, isError: true };
+        const response = await askUserKeypress(
+          `Read outside workspace: ${filePath}`,
+          config.mode as AgentMode,
+          60000,
+          ctx.dataDir,
+          'external_read',
+          filePath
+        );
+        if (response === 'n' || response === 'r') {
+          return { data: `Denied: path outside workspace (${filePath})`, nextPrompt: null, shouldExit: false, isError: true };
+        }
       }
       try {
         const content = await readFile(filePath, 'utf-8');

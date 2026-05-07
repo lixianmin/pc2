@@ -1,5 +1,8 @@
-import { describe, it, expect } from 'vitest';
-import { extractPrefix, classifyCommand } from '../../../src/tools/permission.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { extractPrefix, classifyCommand, loadPermissions, savePermission } from '../../../src/tools/permission.js';
+import { mkdtempSync, rmSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
 
 describe('extractPrefix', () => {
   it('extracts single-word command', () => {
@@ -73,5 +76,22 @@ describe('classifyCommand', () => {
 
   it('classifies test command as allow', () => {
     expect(classifyCommand('test -x /tmp/mineru-env/bin/mineru')).toEqual({ action: 'allow', prefix: 'test' });
+  });
+});
+
+describe('permissions persistence', () => {
+  let dir: string;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'pc2-perm-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  it('loads empty store when no file exists', () => {
+    const s = loadPermissions(dir);
+    expect(s.bash).toEqual({});
+  });
+
+  it('saves and loads permission', () => {
+    savePermission(dir, 'bash', 'cp', true);
+    const s = loadPermissions(dir);
+    expect(s.bash['cp']).toBe(true);
   });
 });

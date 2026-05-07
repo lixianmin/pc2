@@ -91,7 +91,7 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
         return execBash(cmd, args.timeout as number | undefined, ctx.workspaceRoot, opts.cwd);
       }
 
-      const response = await askUserKeypress(`Bash: ${cmd}`, config.mode as AgentMode);
+      const response = await askUserKeypress(`Bash: ${cmd}`, config.mode as AgentMode, 60000, ctx.dataDir, 'bash', perm.prefix);
       if (response === 'n' || response === 'r') {
         const reason = response === 'r' ? 'User rejected all pending requests' : 'User denied this command';
         return { data: `Denied: ${reason}`, nextPrompt: null, shouldExit: false, isError: true };
