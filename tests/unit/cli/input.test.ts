@@ -220,7 +220,7 @@ describe('readMultiline', () => {
     expect(result).toBe('a');
   });
 
-  it('Tab inserts 2 spaces when not a slash command', async () => {
+  it('Tab on non-slash line resolves with mode switch sentinel', async () => {
     const stdin = mockStdin();
     const { ee: stdout } = mockStdout();
     setStdin(stdin);
@@ -234,7 +234,7 @@ describe('readMultiline', () => {
     emitKey(stdin, key('return'));
 
     const result = await promise;
-    expect(result).toBe('  ');
+    expect(result).toBe('__OP_MODE_SWITCH__');
   });
 
   it('Tab completes slash command with unique match', async () => {

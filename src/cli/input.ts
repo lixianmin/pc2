@@ -17,9 +17,9 @@ function commonPrefix(strings: string[]): string {
   return prefix;
 }
 
-export const DEFAULT_SLASH_COMMANDS = ['/sessions', '/resume'];
+export const DEFAULT_SLASH_COMMANDS = ['/sessions', '/resume', '/mode'];
 
-export function readMultiline(prompt: string, options?: { slashCommands?: string[] }): Promise<string | null> {
+export function readMultiline(prompt: string, options?: { slashCommands?: string[]; mode?: string }): Promise<string | null> {
   return new Promise<string | null>((resolve) => {
     const stdin = process.stdin;
     const stdout = process.stdout;
@@ -30,6 +30,27 @@ export function readMultiline(prompt: string, options?: { slashCommands?: string
     }
 
     const slashCommands = options?.slashCommands ?? DEFAULT_SLASH_COMMANDS;
+    const modeLabel = options?.mode;
+
+    const MODE_COLORS: Record<string, string> = {
+      default: '',
+      yolo: '\x1b[91m',
+      plan: '\x1b[94m',
+    };
+
+    let effectivePrompt = prompt;
+    const promptLines = prompt.split('\n');
+    let promptLastLineLen = promptLines[promptLines.length - 1]?.length ?? 0;
+
+    if (modeLabel) {
+      const color = MODE_COLORS[modeLabel.toLowerCase()] ?? '';
+      const coloredPrefix = color ? `${color}[${modeLabel}]\x1b[0m ` : `[${modeLabel}] `;
+      const visualPrefix = `[${modeLabel}] `;
+      const lastNewline = prompt.lastIndexOf('\n');
+      effectivePrompt = prompt.slice(0, lastNewline + 1) + coloredPrefix + prompt.slice(lastNewline + 1);
+      promptLastLineLen = (promptLines[promptLines.length - 1]?.length ?? 0) + visualPrefix.length;
+    }
+
     let lastCandidates: string[] = [];
 
     let buffer = '';
@@ -38,8 +59,6 @@ export function readMultiline(prompt: string, options?: { slashCommands?: string
     let resolved = false;
 
     const termWidth = () => stdout.columns || 80;
-    const promptLines = prompt.split('\n');
-    const promptLastLineLen = promptLines[promptLines.length - 1].length;
 
     function vWidth(str: string): number {
       let w = 0;
@@ -84,7 +103,7 @@ export function readMultiline(prompt: string, options?: { slashCommands?: string
         stdout.write(`\x1b[${previousVisualLines - 1}A`);
       }
       stdout.write('\x1b[J');
-      stdout.write(prompt + buffer);
+      stdout.write(effectivePrompt + buffer);
 
       const totalLines = visualLineCount(buffer);
       previousVisualLines = totalLines;
@@ -130,7 +149,7 @@ export function readMultiline(prompt: string, options?: { slashCommands?: string
       }
       stdout.write('\x1b[J');
       if (writeBuffer) {
-        stdout.write(prompt + buffer);
+        stdout.write(effectivePrompt + buffer);
       }
       stdout.write('\n');
       disableKittyProtocol();
@@ -322,10 +341,8 @@ export function readMultiline(prompt: string, options?: { slashCommands?: string
           render();
           return;
         }
-        buffer = buffer.slice(0, cursorPos) + '  ' + buffer.slice(cursorPos); // 2 spaces per tab
-        cursorPos += 2;
-        lastCandidates = [];
-        render();
+        cleanup(false);
+        resolve('__OP_MODE_SWITCH__');
         return;
       }
 

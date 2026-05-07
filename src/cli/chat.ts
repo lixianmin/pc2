@@ -17,6 +17,7 @@ import { writeMeta, updateMeta, listThreads, readMeta } from '../storage/thread.
 import { LmdMcpClient } from '../memory/lmd-client.js';
 import { scanSkillDirectory } from '../skill-sop/loader.js';
 import { readMultiline, DEFAULT_SLASH_COMMANDS } from './input.js';
+import { ModeManager, MODE_LABELS } from '../tools/mode.js';
 import select from '@inquirer/select';
 
 const G = '\x1b[90m'; // dim gray
@@ -124,6 +125,7 @@ export function makeThreadDir(): string {
 
 export async function startChat(options: { initialTask?: string }): Promise<void> {
   logo.init({ console: false });
+  const modeManager = new ModeManager(config.mode);
   const registry = new ToolRegistry();
   registry.register(createFileReadTool());
   registry.register(createFileWriteTool());
@@ -215,15 +217,24 @@ export async function startChat(options: { initialTask?: string }): Promise<void
   const prompt = async () => {
     while (true) {
       const skillCommands = skills.map(s => '/' + s.name);
-      const input = await readMultiline('\n> ', { slashCommands: [...DEFAULT_SLASH_COMMANDS, ...skillCommands] });
+      const input = await readMultiline('\n> ', { slashCommands: [...DEFAULT_SLASH_COMMANDS, ...skillCommands], mode: MODE_LABELS[modeManager.get()] });
       if (input === null) {
         shutdown();
         return;
+      }
+      if (input === '__OP_MODE_SWITCH__') {
+        modeManager.next();
+        continue;
       }
       if (!input.trim()) continue;
       if (input === 'exit' || input === 'quit') { shutdown(); }
       if (input === '/sessions') { await handleSessions(); continue; }
       if (input.startsWith('/resume')) { await handleResume(input); continue; }
+      if (input === '/mode') { console.log(`Current mode: ${MODE_LABELS[modeManager.get()]}`); continue; }
+      if (input === '/mode default') { modeManager.set('default'); continue; }
+      if (input === '/mode yolo') { modeManager.set('yolo'); continue; }
+      if (input === '/mode plan') { modeManager.set('plan'); continue; }
+      if (input.startsWith('/mode ')) { console.log('Usage: /mode [default|yolo|plan]'); continue; }
 
       const matchedSkill = skills.find(s => input.startsWith('/' + s.name + ' ') || input === '/' + s.name);
       if (matchedSkill) {
@@ -233,7 +244,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
         const threadDir = ensureThread(agentInput);
         turnNum = 0;
         agentStartMs = Date.now();
-        const spinner = createSpinner(`${G}Thinking...${N}`);
+        const spinner = createSpinner(modeManager.get() === 'default' ? `${G}Thinking...${N}` : `${G}[${MODE_LABELS[modeManager.get()]}] Thinking...${N}`);
         for await (const event of loop.execute(agentInput, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills, allowedTools: matchedSkill.allowedTools })) {
           renderEvent(event, spinner);
         }
@@ -249,7 +260,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
 
       turnNum = 0;
       agentStartMs = Date.now();
-      const spinner = createSpinner(`${G}Thinking...${N}`);
+      const spinner = createSpinner(modeManager.get() === 'default' ? `${G}Thinking...${N}` : `${G}[${MODE_LABELS[modeManager.get()]}] Thinking...${N}`);
       for await (const event of loop.execute(input, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
         renderEvent(event, spinner);
       }
@@ -266,7 +277,7 @@ export async function startChat(options: { initialTask?: string }): Promise<void
     const threadDir = ensureThread(options.initialTask);
     turnNum = 0;
     agentStartMs = Date.now();
-    const spinner = createSpinner(`${G}Thinking...${N}`);
+    const spinner = createSpinner(modeManager.get() === 'default' ? `${G}Thinking...${N}` : `${G}[${MODE_LABELS[modeManager.get()]}] Thinking...${N}`);
     for await (const event of loop.execute(options.initialTask, { threadDir, dataDir: config.dataDir, lmdClient, sops, skills })) {
       renderEvent(event, spinner);
     }
