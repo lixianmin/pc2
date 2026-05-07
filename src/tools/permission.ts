@@ -1,3 +1,5 @@
+import { parseKeypress } from '../cli/parse-keypress.js';
+
 export const PermissionAction = {
   DENY: 'deny',
   ALLOW: 'allow',
@@ -70,8 +72,6 @@ export function classifyCommand(cmd: string): PermissionResult {
 
   return { action: 'ask', prefix };
 }
-
-import { parseKeypress } from '../cli/parse-keypress.js';
 
 export type AskResponse = 'y' | 'n' | 'a' | 'r';
 
