@@ -151,7 +151,9 @@ export function readMultiline(prompt: string, options?: { slashCommands?: string
       if (writeBuffer) {
         stdout.write(effectivePrompt + buffer);
       }
-      stdout.write('\n');
+      if (writeBuffer || buffer.length > 0) {
+        stdout.write('\n');
+      }
       disableKittyProtocol();
       if (stdin.isRaw) {
         stdin.setRawMode(false);
