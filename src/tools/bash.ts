@@ -2,6 +2,8 @@ import { exec } from 'child_process';
 import { promisify } from 'util';
 import type { Tool, ToolContext } from './types.js';
 import type { StepOutcome } from '../types.js';
+import type { AgentMode } from './mode.js';
+import { config } from '../config.js';
 import { classifyCommand, askUserKeypress } from './permission.js';
 
 const execAsync = promisify(exec);
@@ -89,7 +91,7 @@ export function createBashTool(opts: BashToolOptions = {}): Tool {
         return execBash(cmd, args.timeout as number | undefined, ctx.workspaceRoot, opts.cwd);
       }
 
-      const response = await askUserKeypress(`Bash: ${cmd}`);
+      const response = await askUserKeypress(`Bash: ${cmd}`, config.mode as AgentMode);
       if (response === 'n' || response === 'r') {
         const reason = response === 'r' ? 'User rejected all pending requests' : 'User denied this command';
         return { data: `Denied: ${reason}`, nextPrompt: null, shouldExit: false, isError: true };

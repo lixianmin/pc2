@@ -1,3 +1,4 @@
+import type { AgentMode } from './mode.js';
 import { parseKeypress } from '../cli/parse-keypress.js';
 
 export const PermissionAction = {
@@ -75,8 +76,11 @@ export function classifyCommand(cmd: string): PermissionResult {
 
 export type AskResponse = 'y' | 'n' | 'a' | 'r';
 
-export function askUserKeypress(question: string, timeoutMs = 60000): Promise<AskResponse> {
+export function askUserKeypress(question: string, mode: AgentMode = 'default', timeoutMs = 60000): Promise<AskResponse> {
   return new Promise((resolve) => {
+    if (mode === 'yolo') { resolve('a'); return; }
+    if (mode === 'plan') { resolve('n'); return; }
+
     const stdin = process.stdin;
     if (!stdin.isTTY) {
       resolve('n');

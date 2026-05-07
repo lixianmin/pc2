@@ -40,4 +40,6 @@ export const config = {
   // 10 MB max log file size before rotation
   logMaxFileSize: 10 * 1024 * 1024,
   webSearchUrl: process.env.WEB_SEARCH_URL ?? 'http://127.0.0.1:5001',
+  mode: 'default' as 'default' | 'yolo' | 'plan',
+  subAgentAutoApprove: false,
 };
