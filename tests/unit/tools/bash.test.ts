@@ -57,15 +57,15 @@ describe('bash tool', () => {
     });
   });
 
-  it('executes a read-only command and returns output', async () => {
-    const tool = createBashTool({ autoApprove: true });
+  it('executes an auto-allowed command and returns output', async () => {
+    const tool = createBashTool();
     const result = await tool.execute({ command: 'echo hello' }, dummyCtx as any);
     expect(String(result.data)).toContain('hello');
   });
 
   it('defaults cwd to workspaceRoot when opts.cwd is not set', async () => {
     const ctxWithRoot = { ...dummyCtx, workspaceRoot: '/tmp' } as any;
-    const tool = createBashTool({ autoApprove: true });
+    const tool = createBashTool();
     const result = await tool.execute({ command: 'pwd' }, ctxWithRoot);
     // /tmp may be a symlink on macOS; accept the resolved path
     const pwd = String(result.data).trim();
@@ -73,76 +73,75 @@ describe('bash tool', () => {
   });
 
   it('truncates oversized output', async () => {
-    // Generate ~60KB of output via printf; the shell will produce it
-    const tool = createBashTool({ autoApprove: true });
-    const result = await tool.execute({ command: 'printf "x%.0s" {1..60000}' }, dummyCtx as any);
+    // node -e is auto-allowed; generate ~60KB output
+    const tool = createBashTool();
+    const result = await tool.execute({ command: "node -e \"process.stdout.write('x'.repeat(60000))\"" }, dummyCtx as any);
     const data = String(result.data);
     expect(data.length).toBeLessThanOrEqual(50100); // 50KB + small overhead
     expect(data).toContain('[truncated]');
   });
 
-  it('curl requires approval when autoApprove is false', async () => {
-    const tool = createBashTool({ autoApprove: false });
+  it('curl is denied when not in allowedTools', async () => {
+    const tool = createBashTool();
     const result = await tool.execute({ command: 'curl http://example.com' }, dummyCtx as any);
-    expect(String(result.data)).toContain('requires approval');
+    expect(String(result.data)).toContain('Denied');
   });
 
-  it('curl executes when autoApprove is true', async () => {
-    const tool = createBashTool({ autoApprove: true });
-    const result = await tool.execute({ command: 'curl --version' }, dummyCtx as any);
-    expect(String(result.data)).not.toContain('Blocked');
-    expect(String(result.data)).not.toContain('requires approval');
+  it('node -e auto-allow executes and returns output', async () => {
+    const tool = createBashTool();
+    const result = await tool.execute({ command: "node -e \"process.stdout.write('ok')\"" }, dummyCtx as any);
+    expect(String(result.data)).toContain('ok');
   });
 
   describe('approval wiring', () => {
-    it('auto-executes read-only commands without autoApprove', async () => {
-      const tool = createBashTool({ autoApprove: false });
+    it('auto-executes auto-allowed commands', async () => {
+      const tool = createBashTool();
       const result = await tool.execute({ command: 'pwd' }, dummyCtx as any);
-      expect(String(result.data)).not.toContain('requires approval');
+      expect(String(result.data)).not.toContain('Denied');
     });
 
-    it('rejects non-read-only command when autoApprove is false', async () => {
-      const tool = createBashTool({ autoApprove: false, cwd: '/tmp' });
+    it('rejects non-read-only command when not in allowedTools', async () => {
+      const tool = createBashTool({ cwd: '/tmp' });
       const result = await tool.execute({ command: 'touch /tmp/bash-test-reject' }, dummyCtx as any);
-      expect(String(result.data)).toContain('requires approval');
+      expect(String(result.data)).toContain('Denied');
     });
 
-    it('executes non-read-only command when autoApprove is true', async () => {
-      const tool = createBashTool({ autoApprove: true, cwd: '/tmp' });
-      const result = await tool.execute({ command: 'touch /tmp/bash-test-approval' }, dummyCtx as any);
-      expect(String(result.data)).not.toContain('requires approval');
+    it('node -e auto-allow executes without approval', async () => {
+      const tool = createBashTool();
+      const result = await tool.execute({ command: "node -e \"require('fs').writeFileSync('/tmp/bash-test-approval', 'ok')\"" }, dummyCtx as any);
+      expect(String(result.data)).not.toContain('Denied');
     });
   });
 
   describe('allowedTools whitelist', () => {
     it('allows pip install when allowedTools matches Bash(pip*)', async () => {
-      const tool = createBashTool({ autoApprove: false });
+      const tool = createBashTool();
       const result = await tool.execute({ command: 'pip install mineru[all]' }, dummyCtxWithAllowed(['Bash(pip*)']) as any);
-      expect(String(result.data)).not.toContain('requires approval');
+      expect(String(result.data)).not.toContain('Denied');
     });
 
     it('allows mineru when allowedTools matches Bash(mineru*)', async () => {
-      const tool = createBashTool({ autoApprove: false });
+      const tool = createBashTool();
       const result = await tool.execute({ command: 'mineru -p input.pdf -o /tmp/out' }, dummyCtxWithAllowed(['Bash(mineru*)']) as any);
-      expect(String(result.data)).not.toContain('requires approval');
+      expect(String(result.data)).not.toContain('Denied');
     });
 
     it('blocks command not in allowedTools', async () => {
-      const tool = createBashTool({ autoApprove: false });
-      const result = await tool.execute({ command: 'rm -rf /' }, dummyCtxWithAllowed(['Bash(pip*)']) as any);
-      expect(String(result.data)).toContain('requires approval');
+      const tool = createBashTool();
+      const result = await tool.execute({ command: 'touch /tmp/nope' }, dummyCtxWithAllowed(['Bash(pip*)']) as any);
+      expect(String(result.data)).toContain('Denied');
     });
 
     it('blocks when allowedTools is empty', async () => {
-      const tool = createBashTool({ autoApprove: false });
+      const tool = createBashTool();
       const result = await tool.execute({ command: 'pip install foo' }, dummyCtxWithAllowed([]) as any);
-      expect(String(result.data)).toContain('requires approval');
+      expect(String(result.data)).toContain('Denied');
     });
 
     it('has no effect when allowedTools is undefined', async () => {
-      const tool = createBashTool({ autoApprove: false });
+      const tool = createBashTool();
       const result = await tool.execute({ command: 'pip install foo' }, dummyCtx as any);
-      expect(String(result.data)).toContain('requires approval');
+      expect(String(result.data)).toContain('Denied');
     });
   });
 });

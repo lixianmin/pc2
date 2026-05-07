@@ -63,7 +63,7 @@ describe('PDF processing integration', () => {
       agentId: 'test', isSubAgent: false, workspaceRoot: process.cwd(),
     };
     const result = await tool.execute({ command: 'python3 -c "print(42)"' }, ctx as any);
-    expect(String(result.data)).toContain('requires approval');
+    expect(String(result.data)).toContain('Denied');
   });
 
   it('extracts PDF text with pdfplumber', async () => {
