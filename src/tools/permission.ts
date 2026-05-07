@@ -1,7 +1,7 @@
 export const PermissionAction = {
-  DENY: 'deny' as const,
-  ALLOW: 'allow' as const,
-  ASK: 'ask' as const,
+  DENY: 'deny',
+  ALLOW: 'allow',
+  ASK: 'ask',
 } as const;
 export type PermissionAction = (typeof PermissionAction)[keyof typeof PermissionAction];
 
@@ -13,13 +13,13 @@ export interface PermissionResult {
 
 const HARDLINE_PATTERNS: { pattern: RegExp; reason: string }[] = [
   { pattern: /\brm\s+-rf\s+\//, reason: 'rm -rf / is never allowed' },
-  { pattern: /\bmkfs\./, reason: 'mkfs is never allowed' },
+  { pattern: /\bmkfs\b/, reason: 'mkfs is never allowed' },
   { pattern: /\bdd\s+.*of=\/dev\//, reason: 'dd to /dev/ is never allowed' },
   { pattern: /[>&]\s*\/dev\/sd[a-z]\b/, reason: 'writing to block device is never allowed' },
   { pattern: /\b(shutdown|reboot|halt|poweroff)\b/, reason: 'system power commands are never allowed' },
   { pattern: /:\s*\(\s*\)\s*{\s*:\s*\|\s*:\s*&\s*}\s*;/, reason: 'fork bomb is never allowed' },
   { pattern: /\bkill\s+-9\s+-1\b/, reason: 'kill -9 -1 is never allowed' },
-  { pattern: /\bchmod\s+777\s+\//, reason: 'chmod 777 on root is never allowed' },
+  { pattern: /\bchmod\s+(-R\s+)?777\s+\//, reason: 'chmod 777 on root is never allowed' },
   { pattern: /\bchown\s+-R\s+root:root\s+\//, reason: 'chown -R root:root on root is never allowed' },
 ];
 

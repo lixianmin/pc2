@@ -38,6 +38,26 @@ describe('classifyCommand', () => {
     expect(r.reason).toContain('rm -rf /');
   });
 
+  it('classifies mkfs as deny', () => {
+    expect(classifyCommand('mkfs.ext4 /dev/sda').action).toBe('deny');
+  });
+
+  it('classifies shutdown as deny', () => {
+    expect(classifyCommand('shutdown now').action).toBe('deny');
+  });
+
+  it('classifies dd to /dev as deny', () => {
+    expect(classifyCommand('dd if=/dev/zero of=/dev/sda').action).toBe('deny');
+  });
+
+  it('classifies chmod -R 777 / as deny', () => {
+    expect(classifyCommand('chmod -R 777 /').action).toBe('deny');
+  });
+
+  it('classifies chown -R root:root / as deny', () => {
+    expect(classifyCommand('chown -R root:root /').action).toBe('deny');
+  });
+
   it('classifies echo with pipe as allow', () => {
     expect(classifyCommand('echo hello | cat')).toEqual({ action: 'allow', prefix: 'echo' });
   });
